@@ -1,66 +1,53 @@
-// http://stackoverflow.com/a/13370778/421846
 #include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
 #include <string.h>
 
-//  !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~
+// http://stackoverflow.com/a/13370778/421846
 
-struct context
+/* The alphabet consists of bytes [0,255] */
+static const unsigned int UPPER = UCHAR_MAX;
+static const unsigned int TAKE = 3;
+
+void print_pw(unsigned int *s)
 {
-    char *alpha;
-    unsigned int alpha_len;
-    int take;
-};
-
-void print_pw(unsigned int *s, struct context *ctx);
+    for (int i = 0; i < TAKE; i++){
+        printf("%02x ", s[i]);
+    }
+    printf("\n");
+}
 
 
 int main(int argc, char **argv)
 {
-    struct context ctx;
-    /* char ALPHA[] = "ABCDEF"; */
-    ctx.alpha = 0;
-    ctx.alpha_len = 256;        // UCHAR_MAX limits.h
-    ctx.take = 3;
-
     /* Type must be large enough to contain alphabet + 1. Otherwise, we run
        into overflow issues. */
-    unsigned int pw[ctx.take];
-    for (int r = 0; r < ctx.take; r++) pw[r] = 0;
+    unsigned int pw[TAKE];
+    for (int r = 0; r < TAKE; r++) pw[r] = 0;
 
-    print_pw(pw, &ctx);
+    print_pw(pw);
 
     for (;;) {
         int end = 0;
-        for (int k = 0; k < ctx.take; k++)
-            if (pw[k] == ctx.alpha_len - 1) end++;
-        if (end == ctx.take) {
-            print_pw(pw, &ctx);
+        for (int k = 0; k < TAKE; k++)
+            if (pw[k] == UPPER) end++;
+        if (end == TAKE) {
+            print_pw(pw);
             printf("\nAccomplisshed!\n");
             break;
         }
 
-        pw[ctx.take-1] += 1;
+        pw[TAKE-1] += 1;
 
-        for (int i = ctx.take - 1; i > 0; i--) {
-            if (pw[i] == ctx.alpha_len) {
+        for (int i = TAKE - 1; i > 0; i--) {
+            if (pw[i] == UPPER + 1) {
                 pw[i] = 0;
                 pw[i-1] += 1;
             }
         }
 
-        print_pw(pw, &ctx);
+        print_pw(pw);
     }
 
     return 0;
-}
-
-
-/* This only print. */
-void print_pw(unsigned int *s, struct context *ctx)
-{
-    for (int i = 0; i < ctx->take; i++){
-        printf("%02x ", s[i]);
-    }
-    printf("\n");
 }
