@@ -12,17 +12,20 @@ struct context
     int take;
 };
 
-void print_pw(unsigned char *s, struct context *ctx);
+void print_pw(unsigned int *s, struct context *ctx);
 
 
 int main(int argc, char **argv)
 {
     struct context ctx;
-    ctx.alpha = "ABCDEF";
-    ctx.alpha_len = strlen(ctx.alpha);
-    ctx.take = 4;
+    /* char ALPHA[] = "ABCDEF"; */
+    ctx.alpha = 0;
+    ctx.alpha_len = 256;        // UCHAR_MAX limits.h
+    ctx.take = 3;
 
-    unsigned char pw[ctx.take]; // char as numbers
+    /* Type must be large enough to contain alphabet + 1. Otherwise, we run
+       into overflow issues. */
+    unsigned int pw[ctx.take];
     for (int r = 0; r < ctx.take; r++) pw[r] = 0;
 
     print_pw(pw, &ctx);
@@ -38,12 +41,14 @@ int main(int argc, char **argv)
         }
 
         pw[ctx.take-1] += 1;
+
         for (int i = ctx.take - 1; i > 0; i--) {
             if (pw[i] == ctx.alpha_len) {
                 pw[i] = 0;
                 pw[i-1] += 1;
             }
         }
+
         print_pw(pw, &ctx);
     }
 
@@ -52,10 +57,10 @@ int main(int argc, char **argv)
 
 
 /* This only print. */
-void print_pw(unsigned char *s, struct context *ctx)
+void print_pw(unsigned int *s, struct context *ctx)
 {
     for (int i = 0; i < ctx->take; i++){
-        printf("%c", (ctx->alpha[s[i]]));
+        printf("%02x ", s[i]);
     }
     printf("\n");
 }
