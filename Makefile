@@ -13,12 +13,12 @@ all: $(EXE)
 	@printf "$(EXE)\n"
 
 $(EXE): $(OBJ)
-	@$(CC) -o $@ $^ $(LDFLAGS)
+	$(CC) -o $@ $^ $(LDFLAGS)
 	@printf "\e[33mLinking\e[0m %s\n" $@
 	@printf "\e[34mDone!\e[0m\n"
 
 %.o: %.c
-	@$(CC) -o $@ -c $< $(CFLAGS)
+	$(CC) -o $@ -c $< $(CFLAGS)
 	@printf "\e[36mCompile\e[90m %s\e[0m\n" $@
 
 .PHONY: clean mrproper
@@ -28,7 +28,7 @@ clean:
 	@printf "\e[34mAll clear!\e[0m\n"&
 
 mrproper: clean
-	@rm -rf $(EXEC)
+	@rm -rf $(EXE)
 
 
 # Show variables (for debug use only.)
