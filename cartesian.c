@@ -1,101 +1,59 @@
-#include <limits.h>
-#include <math.h>
-#include <stdbool.h>
+// http://stackoverflow.com/a/23045070/421846
+
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <omp.h>
+#include <stdlib.h>
 
-// http://stackoverflow.com/a/13370778/421846
 
-/* The alphabet consists of bytes [0,255] */
-static const unsigned char UPPER = 9; // UCHAR_MAX;
-static const unsigned char TAKE = 3;
+#define ALPHA_MAX 256
 
-void print_pw(unsigned char *s, int ithr)
-{
-    printf("%u: ", ithr);
-    for (int i = 0; i < TAKE; i++){
-        printf("%02x ", s[i]);
+
+unsigned long long powull(unsigned long long base, unsigned long long exp){
+    unsigned long long result = 1;
+    while (exp > 0) {
+        if (exp & 1)
+            result *= base;
+        base = base * base;
+        exp >>=1;
     }
-    printf("\n");
+    return result;
+}
+
+struct gen_ctx
+{
+    char               alpha[ALPHA_MAX];
+    unsigned           pw_len;
+    unsigned           alpha_len;
+    unsigned long long total_n;
+};
+
+void gen_ctx_init(struct gen_ctx *ctx, const char *a, const unsigned len) {
+    strncpy(ctx->alpha, a, ALPHA_MAX);
+    ctx->alpha_len = strlen(ctx->alpha);
+    ctx->pw_len = len;
+    ctx->total_n = powull(ctx->alpha_len, ctx->pw_len);
+}
+
+void gen_with_range(struct gen_ctx *ctx,
+                    unsigned long long start, unsigned long long end) {
+    char *pw = calloc(ctx->pw_len+1, sizeof(char));
+    unsigned long long i, j;
+    for (i = start; i < end; ++i){
+        unsigned long long n = i;
+        for (j = 0; j < ctx->pw_len; ++j){
+            pw[ctx->pw_len -j -1] = ctx->alpha[n % ctx->alpha_len];
+            n /= ctx->alpha_len;
+        }
+        printf("[%s]\n", pw);
+    }
+    free(pw);
 }
 
 
-int main(int argc, char **argv)
-{
-    unsigned char pw[TAKE];
-    bool carry[TAKE];
-    for (int r = 0; r < TAKE; r++) {
-        pw[r] = 0;
-        carry[r] = 0;
-    }
-
-    long long glob_iter =
-        (long long)pow((double)(UPPER + 1), (double)TAKE);
-    printf("total glob_iter:  %lli\n", glob_iter);
-    long long k;
-
-#pragma omp parallel private(pw, k) firstprivate(carry)
-    {
-        long long thr_iter = 0;
-
-        // pw needs to be initialized here like
-        const int nthreads = omp_get_num_threads();
-        const int ithread = omp_get_thread_num();
-        const long long start = glob_iter * ithread / nthreads;
-        const long long finish = glob_iter * (ithread + 1) / nthreads;
-
-        for (int r = 0; r < TAKE; r++) {
-            pw[r] = start % (long long)pow((double)(UPPER + 1), (double)(TAKE-r));
-        }
-
-#pragma omp for schedule(monotonic:static)
-        for (long long k = start; k < finish; k++) {
-            ++thr_iter;
-
-#pragma omp critical
-            print_pw(pw, ithread);
-
-            if (pw[TAKE-1] + 1 > UPPER) {
-                pw[TAKE-1] = 0;
-                carry[TAKE-2] = true;
-            }
-            else {
-                pw[TAKE-1] += 1;
-            }
-
-            for (int i = TAKE - 2; i > 0; i--) {
-                if (carry[i]) {
-                    if (pw[i] + 1 > UPPER) {
-                        pw[i] = 0;
-                        carry[i-1] = true;
-                    }
-                    else {
-                        pw[i] += 1;
-                    }
-                    carry[i] = false;
-                }
-            }
-
-            if (carry[0]) {
-                if (pw[0] + 1 > UPPER) {  /* FIXME: limit should be finish */
-                    printf("\nAccomplisshed!\n");
-                    /* break; */
-                    #pragma omp cancel for
-                }
-                else {
-                    pw[0] += 1;
-                }
-                carry[0] = false;
-            }
-
-#pragma omp cancellation point for
-        }
-
-        printf("Thread %u: %lli iterations completed\n", ithread, thr_iter);
-
-    } // end omp parallel
+int main(int argc, char *argv[]){
+    struct gen_ctx ctx;
+    gen_ctx_init(&ctx, "abcdef", 4);
+    gen_with_range(&ctx, 0, ctx.total_n);
 
     return 0;
 }
