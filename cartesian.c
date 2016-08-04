@@ -5,9 +5,6 @@
 #include <stdlib.h>
 
 
-#define ALPHA_MAX 256
-
-
 unsigned long long powull(unsigned long long base, unsigned long long exp){
     unsigned long long result = 1;
     while (exp > 0) {
@@ -21,22 +18,30 @@ unsigned long long powull(unsigned long long base, unsigned long long exp){
 
 struct gen_ctx
 {
-    char               alpha[ALPHA_MAX];
-    unsigned           pw_len;
-    unsigned           alpha_len;
-    unsigned long long total_n;
+    char               *alpha;
+    unsigned            pw_len;
+    unsigned            alpha_len;
+    unsigned long long  total_n;
 };
 
-void gen_ctx_init(struct gen_ctx *ctx, const char *a, const unsigned len) {
-    strncpy(ctx->alpha, a, ALPHA_MAX);
-    ctx->alpha_len = strlen(ctx->alpha);
+struct gen_ctx *gen_ctx_create(const char *a, const unsigned len) {
+    struct gen_ctx *ctx = malloc(sizeof(struct gen_ctx));
+    ctx->alpha_len = strlen(a);
+    ctx->alpha = calloc(ctx->alpha_len, sizeof(char));
+    strncpy(ctx->alpha, a, ctx->alpha_len);
     ctx->pw_len = len;
     ctx->total_n = powull(ctx->alpha_len, ctx->pw_len);
 }
 
+void gen_ctx_destroy(struct gen_ctx *ctx) {
+    free(ctx->alpha);
+    free(ctx);
+}
+
 void gen_with_range(struct gen_ctx *ctx,
                     unsigned long long start, unsigned long long end) {
-    char *pw = calloc(ctx->pw_len+1, sizeof(char));
+    char pw[ctx->pw_len+1];
+    memset(pw, 0, ctx->pw_len+1);
     unsigned long long i, j;
     for (i = start; i < end; ++i){
         unsigned long long n = i;
@@ -46,14 +51,15 @@ void gen_with_range(struct gen_ctx *ctx,
         }
         printf("[%s]\n", pw);
     }
-    free(pw);
 }
 
 
 int main(int argc, char *argv[]){
-    struct gen_ctx ctx;
-    gen_ctx_init(&ctx, "abcdef", 4);
-    gen_with_range(&ctx, 0, ctx.total_n);
+    struct gen_ctx *ctx = gen_ctx_create("abcdef", 4);
+
+    gen_with_range(ctx, 0, ctx->total_n);
+
+    gen_ctx_destroy(ctx);
 
     return 0;
 }
