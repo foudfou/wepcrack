@@ -79,12 +79,12 @@ void gen_ctx_destroy(struct gen_ctx *ctx) {
 }
 
 void gen_with_range(struct gen_ctx *ctx,
-                    unsigned long long start, unsigned long long end) {
+                    unsigned long long from, unsigned long long until) {
     char pw[ctx->pw_len];
     memset(pw, 0, ctx->pw_len);
 
     unsigned long long i, j;
-    for (i = start; i < end; ++i){
+    for (i = from; i < until; ++i){
         unsigned long long n = i;
         for (j = 0; j < ctx->pw_len; ++j){
             pw[ctx->pw_len -j -1] = ctx->alpha[n % ctx->alpha_len];
@@ -102,10 +102,10 @@ int main(int argc, char *argv[]){
     {
         int ithread = omp_get_thread_num();
         int nthreads = omp_get_num_threads();
-        unsigned long long start = ctx->total_n*ithread/nthreads;
-        unsigned long long end = ctx->total_n*(ithread + 1)/nthreads - 1;
-        printf("%u: %lli -> %lli\n", ithread, start, end);
-        gen_with_range(ctx, start, end);
+        unsigned long long from = ctx->total_n*ithread/nthreads;
+        unsigned long long until = ctx->total_n*(ithread + 1)/nthreads;
+        fprintf(stderr, "%u: %lli -> %lli\n", ithread, from, until);
+        gen_with_range(ctx, from, until);
     }
 
     gen_ctx_destroy(ctx);
