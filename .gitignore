@@ -1,0 +1,4 @@
+bin/
+tmp/
+.gdb_history
+peda-session-wepcrack.txt
