@@ -3,9 +3,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <omp.h>
 
 /* #define ALPHABET "abcdef" */
-/* #define ALPHABET_LEN 4 */
+/* #define ALPHABET_LEN 6 */
+/* #define PASSWORD_LEN 4 */
 
 #define ALPHABET                                                   \
 "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f" \
@@ -25,7 +27,6 @@
 "\xe0\xe1\xe2\xe3\xe4\xe5\xe6\xe7\xe8\xe9\xea\xeb\xec\xed\xee\xef" \
 "\xf0\xf1\xf2\xf3\xf4\xf5\xf6\xf7\xf8\xf9\xfa\xfb\xfc\xfd\xfe\xff"
 #define ALPHABET_LEN 256
-
 #define PASSWORD_LEN 2
 
 
@@ -43,7 +44,7 @@ unsigned long long powull(unsigned long long base, unsigned long long exp){
 void tohex(char *dst, const char *src, size_t len)
 {
     for (int i = 0; i < len; i++)
-        snprintf(&(dst[2*i]), 3, "%02x", src[i]);
+        snprintf(&(dst[2*i]), 3, "%02x", (unsigned char)src[i]);
     dst[2*len+1] = 0;
 }
 
@@ -69,6 +70,7 @@ struct gen_ctx *gen_ctx_create(const char *a, const unsigned a_len,
     memcpy(ctx->alpha, a, ctx->alpha_len);
     ctx->pw_len = pw_len;
     ctx->total_n = powull(ctx->alpha_len, ctx->pw_len);
+    return ctx;
 }
 
 void gen_ctx_destroy(struct gen_ctx *ctx) {
@@ -96,7 +98,15 @@ void gen_with_range(struct gen_ctx *ctx,
 int main(int argc, char *argv[]){
     struct gen_ctx *ctx = gen_ctx_create(ALPHABET, ALPHABET_LEN, PASSWORD_LEN);
 
-    gen_with_range(ctx, 0, ctx->total_n);
+#pragma omp parallel firstprivate(ctx)
+    {
+        int ithread = omp_get_thread_num();
+        int nthreads = omp_get_num_threads();
+        unsigned long long start = ctx->total_n*ithread/nthreads;
+        unsigned long long end = ctx->total_n*(ithread + 1)/nthreads - 1;
+        printf("%u: %lli -> %lli\n", ithread, start, end);
+        gen_with_range(ctx, start, end);
+    }
 
     gen_ctx_destroy(ctx);
 
