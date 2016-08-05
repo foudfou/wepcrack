@@ -30,6 +30,17 @@
 #define PASSWORD_LEN 2
 
 
+typedef void (* gen_apply_fn)(const char *, unsigned);
+
+struct gen_ctx
+{
+    char                *alpha;
+    unsigned            pw_len;
+    unsigned            alpha_len;
+    unsigned long long  total_n;
+};
+
+
 unsigned long long powull(unsigned long long base, unsigned long long exp){
     unsigned long long result = 1;
     while (exp > 0) {
@@ -54,14 +65,6 @@ void print_hex(const char *bytes, unsigned len) {
     printf("%s\n", dst);
 }
 
-struct gen_ctx
-{
-    char               *alpha;
-    unsigned            pw_len;
-    unsigned            alpha_len;
-    unsigned long long  total_n;
-};
-
 struct gen_ctx *gen_ctx_create(const char *a, const unsigned a_len,
                                const unsigned pw_len) {
     struct gen_ctx *ctx = malloc(sizeof(struct gen_ctx));
@@ -78,8 +81,9 @@ void gen_ctx_destroy(struct gen_ctx *ctx) {
     free(ctx);
 }
 
-void gen_with_range(struct gen_ctx *ctx,
-                    unsigned long long from, unsigned long long until) {
+void gen_apply_on_range(struct gen_ctx *ctx,
+                        gen_apply_fn fun,
+                        unsigned long long from, unsigned long long until) {
     char pw[ctx->pw_len];
     memset(pw, 0, ctx->pw_len);
 
@@ -90,12 +94,13 @@ void gen_with_range(struct gen_ctx *ctx,
             pw[ctx->pw_len -j -1] = ctx->alpha[n % ctx->alpha_len];
             n /= ctx->alpha_len;
         }
-        print_hex(pw, ctx->pw_len);
+        (*fun)(pw, ctx->pw_len);
     }
 }
 
 
-int main(int argc, char *argv[]){
+int main(int argc, char *argv[]) {
+    gen_apply_fn pw_apply = print_hex;
     struct gen_ctx *ctx = gen_ctx_create(ALPHABET, ALPHABET_LEN, PASSWORD_LEN);
 
 #pragma omp parallel firstprivate(ctx)
@@ -105,7 +110,7 @@ int main(int argc, char *argv[]){
         unsigned long long from = ctx->total_n*ithread/nthreads;
         unsigned long long until = ctx->total_n*(ithread + 1)/nthreads;
         fprintf(stderr, "%u: %lli -> %lli\n", ithread, from, until);
-        gen_with_range(ctx, from, until);
+        gen_apply_on_range(ctx, pw_apply, from, until);
     }
 
     gen_ctx_destroy(ctx);
