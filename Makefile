@@ -1,5 +1,11 @@
-EXE = wepcrack
-SRC = $(wildcard *.c)
+SHELL = /bin/sh
+
+SRCDIR   = src
+OBJDIR   = obj
+BINDIR   = bin
+
+TARGET = $(BINDIR)/wepcrack
+SRC = $(wildcard $(SRCDIR)/*.c)
 OBJ = $(SRC:.c=.o)
 CC = clang
 has_clang = $(shell clang --version 2> /dev/null)
@@ -9,10 +15,13 @@ endif
 CFLAGS = -std=c11 -g -pedantic -fopenmp
 LDFLAGS = -lm -fopenmp
 
-all: $(EXE)
-	@printf "$(EXE)\n"
+.SUFFIXES:
+.SUFFIXES: .c .o
 
-$(EXE): $(OBJ)
+all: $(TARGET)
+	@printf "$(TARGET)\n"
+
+$(TARGET): $(OBJ)
 	@printf "\e[33mLinking\e[0m %s\n" $@
 	$(CC) -o $@ $^ $(LDFLAGS)
 	@printf "\e[34mDone!\e[0m\n"
@@ -21,19 +30,20 @@ $(EXE): $(OBJ)
 	@printf "\e[36mCompile\e[90m %s\e[0m\n" $@
 	$(CC) -o $@ -c $< $(CFLAGS)
 
-.PHONY: clean mrproper
+.PHONY: clean distclean
 
 clean:
-	@rm -rf *.o
-	@printf "\e[34mAll clear!\e[0m\n"&
+	rm -rf $(OBJ)
+	@printf "\e[34mClean\e[0m\n"&
 
-mrproper: clean
-	@rm -rf $(EXE)
+distclean: clean
+	rm -rf $(TARGET)
+	@printf "\e[34mAll clear!\e[0m\n"&
 
 
 # Show variables (for debug use only.)
 show:
-	@echo 'EXE      :' $(EXE)
+	@echo 'TARGET   :' $(TARGET)
 	@echo 'SRC      :' $(SRC)
 	@echo 'OBJ      :' $(OBJ)
 	@echo 'CFLAGS   :' $(CFLAGS)
