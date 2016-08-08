@@ -52,6 +52,7 @@ clean:
 	rm -rf $(OBJ) $(TESTS)
 	rm -f $(TESTDIR)/tests.log
 	rm -f /tmp/valgrind-*
+	rm -f $(TESTDIR)/*_tests
 	@printf "\e[34mClean\e[0m\n"&
 
 distclean: clean

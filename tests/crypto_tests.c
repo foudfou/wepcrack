@@ -49,14 +49,11 @@ static unsigned char output[7][30] = {
 
 int main(void)
 {
-    int i;
     unsigned char cipher[30];
     unsigned char iv[EVP_MAX_IV_LENGTH] = { 0 };
     int encrypt = 1;
 
-    for (i = 0; i < 6; i++) {
-        printf(".");
-
+    for (int i = 0; i < 6; i++) {
         int out_len = 0;
         bool rv = ssl_crypt(EVP_rc4(), cipher, &out_len, data[i], data_len[i],
                             &keys[i][1], keys[i][0], iv, encrypt);
@@ -65,6 +62,8 @@ int main(void)
             printf("E");
             return(1);
         }
+
+        printf(".");
     }
 
     return(0);

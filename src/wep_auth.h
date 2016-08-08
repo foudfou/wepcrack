@@ -1,0 +1,70 @@
+#ifndef WEP_AUTH_H
+#define WEP_AUTH_H
+
+#include <assert.h>
+#include <openssl/evp.h>
+#include "utils.h"
+#include "crc32.h"
+
+static const int WEP_KEY_LEN = 5;
+
+static const unsigned char wep_chall[] = /* plaintext */
+    "\xe9\xad\xe5\xd8\x36\x51\x7a\x60\x3b\x42\x6b\x13\x44\x57\x60\x7a"
+    "\x48\x31\x82\xcc\x3d\x69\x46\x8f\x93\x82\xff\x06\xde\x43\x24\xc8"
+    "\xf0\x09\xa0\x26\x5b\x1b\x86\x96\x5d\xf1\xa9\xa2\x49\x0a\x1c\x91"
+    "\x3b\x9f\x5d\x78\x08\xa3\x08\x9b\x26\x07\xa1\x04\x4a\xc6\xcc\x3a"
+    "\xcf\x6d\x60\x2a\x88\xe6\xc0\xe5\xd8\x6a\x87\x21\x74\xa4\xb2\xaf"
+    "\x43\x0f\x27\x4b\xb3\x2f\xe7\xd9\x36\x88\xdd\x80\x4e\xaa\xba\x1e"
+    "\x17\x1a\x48\x9f\x01\x09\x84\xd9\x73\x0c\xfa\xe7\xb0\xac\x96\xf3"
+    "\xbb\xbd\x3e\x6e\xed\x25\x47\x23\xae\x25\xa4\xfc\xcf\x5e\x1a\xe6";
+static const int wep_chall_len = 128;
+static const unsigned char wep_data[] =
+    "\x45\xbe\x60\x0e\xd0\x67\x83\xe0\xe1\x80\x13\x30\x79\x23\x89\x3a"
+    "\xb2\x74\xb2\xd2\x38\x44\x52\xb3\xc3\xcb\x59\x93\x44\xd0\x20\xb3"
+    "\x9b\xf9\x6c\xe4\x8f\x6e\x2f\xb1\xa5\x1d\xb0\x19\x89\xb6\x4c\x53"
+    "\x6c\xdb\xc6\xc1\xfb\x60\xf2\x31\xff\xe9\xf2\x74\xc7\x59\x46\xda"
+    "\xb8\x78\x63\x86\xe4\x63\xbc\x00\x9f\xee\x31\xf4\xf7\x51\x96\xe5"
+    "\x75\xef\x3b\xeb\xaf\x7b\xcf\xa7\xda\x0d\x4a\x56\x75\x10\x39\x9a"
+    "\x0a\xa6\x9e\x9a\x59\x31\x40\x0c\x27\xb5\x22\x65\x39\xdc\x53\x85"
+    "\x15\xc7\x7f\xfa\xd9\x02\x14\xd5\x9a\x44\xcc\xf2\x43\xde\x9c\x98"
+    "\x1f\xd6\x5b\x79\xe8\xbb\x52\xb1";
+static const unsigned char wep_iv[] = "\x52\x61\x82";
+static const int wep_iv_len = 3;
+/* CRC32 of payload */
+static const unsigned char wep_icv[]= "\x49\x20\x50\x35";
+
+
+/*
+ * (iv + key = key for RC4/keystream) ^ (challenge + icv/crc32) -> data
+ * This is exactly what the openssl RC4() function does.
+ */
+void wep_auth_check_key(const unsigned char *key, unsigned key_len) {
+    assert(key_len == 5);
+
+    // compute key (IV+key)
+    unsigned char ivkey[8];
+    memcpy(ivkey, wep_iv, wep_iv_len);
+    memcpy(ivkey + 3, key, key_len);
+
+    // compute ICV
+    uint32_t crc = crc32(wep_chall, wep_chall_len);
+    print_hex((unsigned char*)&crc, 4);
+
+    // compute whole plain text (chall + ICV)
+    unsigned char challivc[8];
+    memcpy(challivc, wep_chall, wep_chall_len);
+    memcpy(challivc + wep_chall_len, &crc, wep_chall_len + 4);
+
+    unsigned char out[256];
+    int out_len = 0;
+    unsigned char iv[EVP_MAX_IV_LENGTH] = { 0 };
+    int encrypt = 1;
+    bool rv = ssl_crypt(EVP_rc4(), out, &out_len, challivc, wep_chall_len + 4,
+                        ivkey, 8, iv, encrypt);
+    fprintf(stderr, "rc4 (%s) -> %u\n", rv ? "true" : "false", out_len);
+
+    print_hex(out, out_len);
+}
+
+
+#endif /* WEP_AUTH_H */

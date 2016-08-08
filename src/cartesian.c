@@ -1,10 +1,12 @@
 // http://stackoverflow.com/a/23045070/421846
 
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
 #include <omp.h>
+#include "crc32.h"
 #include "crypto_ssl.h"
+#include "utils.h"
+#include "wep_auth.h"
 
 /* #define ALPHABET "abcdef" */
 /* #define ALPHABET_LEN 6 */
@@ -41,31 +43,6 @@ struct gen_ctx
     unsigned long long  total_n;
 };
 
-
-unsigned long long powull(unsigned long long base, unsigned long long exp){
-    unsigned long long result = 1;
-    while (exp > 0) {
-        if (exp & 1)
-            result *= base;
-        base = base * base;
-        exp >>=1;
-    }
-    return result;
-}
-
-void tohex(char *dst, const unsigned char *src, size_t len)
-{
-    for (size_t i = 0; i < len; i++)
-        snprintf(&(dst[2*i]), 3, "%02x", src[i]);
-    dst[2*len+1] = 0;
-}
-
-void print_hex(const unsigned char *bytes, unsigned len) {
-    char dst[2*len+1];
-    tohex(dst, bytes, len);
-    printf("%s\n", dst);
-}
-
 struct gen_ctx *gen_ctx_create(const char *a, const unsigned a_len,
                                const unsigned pw_len) {
     struct gen_ctx *ctx = malloc(sizeof(struct gen_ctx));
@@ -100,6 +77,8 @@ void gen_apply_on_range(struct gen_ctx *ctx, gen_apply_fn fun,
 
 
 int main(void) {
+    wep_auth_check_key((unsigned char*)"affec", WEP_KEY_LEN);
+
     struct gen_ctx *crack_ctx =
         gen_ctx_create(ALPHABET, ALPHABET_LEN, PASSWORD_LEN);
     gen_apply_fn pw_apply = print_hex;
@@ -118,28 +97,3 @@ int main(void) {
 
     return 0;
 }
-
-
-/* iv + key -(RC4)-> keystream
- * keystream ^ challenge -> data */
-unsigned char iv[] = "\x52\x61\x82";
-unsigned char challenge[] =
-    "\xe9\xad\xe5\xd8\x36\x51\x7a\x60\x3b\x42\x6b\x13\x44\x57\x60\x7a"
-    "\x48\x31\x82\xcc\x3d\x69\x46\x8f\x93\x82\xff\x06\xde\x43\x24\xc8"
-    "\xf0\x09\xa0\x26\x5b\x1b\x86\x96\x5d\xf1\xa9\xa2\x49\x0a\x1c\x91"
-    "\x3b\x9f\x5d\x78\x08\xa3\x08\x9b\x26\x07\xa1\x04\x4a\xc6\xcc\x3a"
-    "\xcf\x6d\x60\x2a\x88\xe6\xc0\xe5\xd8\x6a\x87\x21\x74\xa4\xb2\xaf"
-    "\x43\x0f\x27\x4b\xb3\x2f\xe7\xd9\x36\x88\xdd\x80\x4e\xaa\xba\x1e"
-    "\x17\x1a\x48\x9f\x01\x09\x84\xd9\x73\x0c\xfa\xe7\xb0\xac\x96\xf3"
-    "\xbb\xbd\x3e\x6e\xed\x25\x47\x23\xae\x25\xa4\xfc\xcf\x5e\x1a\xe6";
-unsigned char data[] =
-    "\x45\xbe\x60\x0e\xd0\x67\x83\xe0\xe1\x80\x13\x30\x79\x23\x89\x3a"
-    "\xb2\x74\xb2\xd2\x38\x44\x52\xb3\xc3\xcb\x59\x93\x44\xd0\x20\xb3"
-    "\x9b\xf9\x6c\xe4\x8f\x6e\x2f\xb1\xa5\x1d\xb0\x19\x89\xb6\x4c\x53"
-    "\x6c\xdb\xc6\xc1\xfb\x60\xf2\x31\xff\xe9\xf2\x74\xc7\x59\x46\xda"
-    "\xb8\x78\x63\x86\xe4\x63\xbc\x00\x9f\xee\x31\xf4\xf7\x51\x96\xe5"
-    "\x75\xef\x3b\xeb\xaf\x7b\xcf\xa7\xda\x0d\x4a\x56\x75\x10\x39\x9a"
-    "\x0a\xa6\x9e\x9a\x59\x31\x40\x0c\x27\xb5\x22\x65\x39\xdc\x53\x85"
-    "\x15\xc7\x7f\xfa\xd9\x02\x14\xd5\x9a\x44\xcc\xf2\x43\xde\x9c\x98"
-    "\x1f\xd6\x5b\x79\xe8\xbb\x52\xb1";
-unsigned char icv[]= "\x49\x20\x50\x35"; /* CRC32 of payload */
