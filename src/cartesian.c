@@ -3,10 +3,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <omp.h>
-#include "crc32.h"
 #include "crypto_ssl.h"
 #include "utils.h"
 #include "wep_auth.h"
+#include "wep_data.h"
 
 /* #define ALPHABET "abcdef" */
 /* #define ALPHABET_LEN 6 */
@@ -77,7 +77,9 @@ void gen_apply_on_range(struct gen_ctx *ctx, gen_apply_fn fun,
 
 
 int main(void) {
-    wep_auth_check_key((unsigned char*)"affec", WEP_KEY_LEN);
+    wep_check_key_auth(&wep_auth1, (unsigned char*)"tudes", WEP_KEY_LEN);
+    wep_check_key_auth(&wep_auth2, (unsigned char*)"tudes", WEP_KEY_LEN);
+    return 0;
 
     struct gen_ctx *crack_ctx =
         gen_ctx_create(ALPHABET, ALPHABET_LEN, PASSWORD_LEN);
