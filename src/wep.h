@@ -3,8 +3,8 @@
 
 #include <assert.h>
 #include <openssl/evp.h>
-#include "utils.h"
 #include "crc32.h"
+#include "crypto_ssl.h"
 #include "wep_defs.h"
 
 

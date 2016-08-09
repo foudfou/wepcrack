@@ -1,7 +1,9 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 unsigned long long powull(unsigned long long base, unsigned long long exp)
