@@ -1,7 +1,7 @@
 #ifndef WEP_DATA_H
 #define WEP_DATA_H
 
-#include "wep.h"
+struct wep_data_auth;
 
 extern const struct wep_data_auth wep_auth1;
 extern const struct wep_data_auth wep_auth2;

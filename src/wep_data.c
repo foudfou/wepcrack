@@ -1,4 +1,4 @@
-#include "wep_data.h"
+#include "wep.h"
 
 const struct wep_data_auth wep_auth1 = {
     .frame = {
