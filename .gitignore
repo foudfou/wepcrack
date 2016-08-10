@@ -1,6 +1,7 @@
 bin/
 tmp/
 tests/*_tests
+tests/*log
 .gdb_history
 peda-session-wepcrack.txt
 

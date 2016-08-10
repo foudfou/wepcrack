@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <omp.h>
 #include "cartesian.h"
+#include "utils.h"
 #include "wep.h"
 #include "wep_data.h"
 
