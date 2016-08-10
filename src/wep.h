@@ -23,31 +23,29 @@ void wep_check_key_auth(const struct wep_data_auth *auth,
     print_hex(ivkey, ivkey_len);
 
     // compute ICV
-    uint32_t crc_raw = crc32(auth->chall, auth->chall_len);
+    uint32_t crc_raw = crc32(auth->frame, auth->frame_len);
     unsigned char crc[WEP_ICV_LEN];
     *(uint32_t *)crc = crc_raw;
     print_hex(crc, WEP_ICV_LEN);
 
-    // compute whole plain text (chall + ICV)
-    unsigned int challicv_len = auth->chall_len + WEP_ICV_LEN;
-    unsigned char challicv[challicv_len];
-    memcpy(challicv, auth->chall, auth->chall_len);
-    memcpy(challicv + auth->chall_len, crc, WEP_ICV_LEN);
-    print_hex(challicv, challicv_len);
+    // compute whole plain text (frame + ICV)
+    unsigned int frameicv_len = auth->frame_len + WEP_ICV_LEN;
+    unsigned char frameicv[frameicv_len];
+    memcpy(frameicv, auth->frame, auth->frame_len);
+    memcpy(frameicv + auth->frame_len, crc, WEP_ICV_LEN);
+    print_hex(frameicv, frameicv_len);
 
     unsigned char out[256];
     int out_len = 0;
     unsigned char iv[EVP_MAX_IV_LENGTH] = { 0 };
     int encrypt = 1;
-    bool rv = ssl_crypt(EVP_rc4(), out, &out_len, challicv, challicv_len,
+    bool rv = ssl_crypt(EVP_rc4(), out, &out_len, frameicv, frameicv_len,
                         ivkey, ivkey_len, iv, encrypt);
     fprintf(stderr, "rc4 (%s) -> %u\n", rv ? "true" : "false", out_len);
 
     print_hex(out, out_len);
 
-    /* TODO: to be continued... For now, I can't seem to recreate the correct
-       encrypted data from the challenge. Moreover, I can't find an explanation
-       as to why the data is always 4 bytes+ longer than the challenge... */
+    /* TODO: to be continued... */
 }
 
 // TODO: ...and this is why we'll be only working on data

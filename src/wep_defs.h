@@ -8,8 +8,8 @@
 
 struct wep_data_auth
 {
-    unsigned char chall[256];   /* plaintext */
-    unsigned int  chall_len;
+    unsigned char frame[256];   /* plaintext */
+    unsigned int  frame_len;
     unsigned char data[256];
     unsigned int  data_len;
     unsigned char iv[WEP_IV_LEN];
