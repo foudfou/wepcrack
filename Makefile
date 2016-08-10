@@ -32,12 +32,12 @@ dev: all
 
 $(TARGET): $(OBJ)
 	@printf "\e[33mLinking\e[0m %s\n" $@
-	$(CC) -o $@ $^ $(LDFLAGS)
+	@$(CC) -o $@ $^ $(LDFLAGS)
 	@printf "\e[34mMain target built\e[0m\n"
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.c
-	@printf "\e[36mCompile\e[90m %s\e[0m\n" $@
-	$(CC) -o $@ -c $< $(CFLAGS)
+	@printf "\e[36mCompiling\e[0m %s\n" $@
+	@$(CC) -o $@ -c $< $(CFLAGS)
 
 test: $(TESTS)
 	@sh $(TESTDIR)/runtests.sh
@@ -45,7 +45,7 @@ test: $(TESTS)
 $(TESTS): $(TEST_SRC)
 	@printf "\e[32mBuilding test\e[0m %s\n" $@
 	$(CC) -o $@ $^ $(TEST_OBJ) $(CFLAGS) $(LDFLAGS)
-	@printf "\e[32mTests built\e[0m %s\n" $@
+	@printf "\e[32mTests built\e[0m\n"
 
 valgrind:
 	VALGRIND="valgrind -v --leak-check=full --show-leak-kinds=all \
