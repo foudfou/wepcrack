@@ -39,6 +39,8 @@ int main(void) {
     fprintf(stderr, "keychk (%s) -> %s\n", key, BOOL2STR(keychk));
     keychk = wep_check_key_auth(&wep_auth2, key, WEP_KEY_LEN);
     fprintf(stderr, "keychk (%s) -> %s\n", key, BOOL2STR(keychk));
+    keychk = wep_check_key_data(&wep_data1, key, WEP_KEY_LEN);
+    fprintf(stderr, "keychk (%s) -> %s\n", key, BOOL2STR(keychk));
     return 0;
 
     struct gen_ctx *crack_ctx =

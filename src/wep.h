@@ -9,9 +9,9 @@
 #define WEP_KEY_LEN 5
 #define WEP_IV_LEN  3
 #define WEP_ICV_LEN 4
-#define WEP_PAYLOAD_MAX 256
+#define WEP_PAYLOAD_MAX 1024
 
-struct wep_data_auth
+struct wep_data
 {
     unsigned char frame[WEP_PAYLOAD_MAX]; /* plaintext */
     unsigned int  frame_len;
@@ -20,9 +20,10 @@ struct wep_data_auth
     unsigned char iv[WEP_IV_LEN];
 };
 
-bool wep_check_key_auth(const struct wep_data_auth *auth,
+bool wep_check_key_auth(const struct wep_data *auth,
                         const unsigned char *key, unsigned int key_len);
 
-bool wep_check_key_data(const unsigned char *key, unsigned int key_len);
+bool wep_check_key_data(const struct wep_data *auth,
+                        const unsigned char *key, unsigned int key_len);
 
 #endif /* WEP_H */

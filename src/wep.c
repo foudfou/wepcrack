@@ -5,25 +5,33 @@
 #include "utils.h"
 #include "wep.h"
 
+static void compute_ivkey(unsigned char *ivkey, const unsigned char *iv,
+                       const unsigned char *key, const unsigned int key_len) {
+    memcpy(ivkey, iv, WEP_IV_LEN);
+    memcpy(ivkey + WEP_IV_LEN, key, key_len);
+}
+
+static void compute_crc(unsigned char *crc,
+                     const unsigned char *frame, const unsigned int frame_len) {
+    uint32_t crc_raw = crc32(frame, frame_len);
+    *(uint32_t *)crc = crc_raw;
+}
+
 /* (iv + key = key for RC4/keystream) ^ (frame header + challenge + icv/crc32)
  * -> data.  This is exactly what the openssl RC4() function does: xor's some
  * input with the RC4 PRNG derived from a key.
  */
-bool wep_check_key_auth(const struct wep_data_auth *auth,
+bool wep_check_key_auth(const struct wep_data *auth,
                         const unsigned char *key, unsigned int key_len) {
     assert(key_len == WEP_KEY_LEN);
 
-    // compute key (IV+key)
     unsigned int ivkey_len = WEP_IV_LEN + key_len;
     unsigned char ivkey[ivkey_len];
-    memcpy(ivkey, auth->iv, WEP_IV_LEN);
-    memcpy(ivkey + WEP_IV_LEN, key, key_len);
+    compute_ivkey(ivkey, auth->iv, key, key_len);
     print_hex(ivkey, ivkey_len);
 
-    // compute ICV of plain data
-    uint32_t crc_raw = crc32(auth->frame, auth->frame_len);
     unsigned char crc[WEP_ICV_LEN];
-    *(uint32_t *)crc = crc_raw;
+    compute_crc(crc, auth->frame, auth->frame_len);
     print_hex(crc, WEP_ICV_LEN);
 
     // compute whole plain text (frame + ICV)
@@ -33,34 +41,47 @@ bool wep_check_key_auth(const struct wep_data_auth *auth,
     memcpy(frameicv + auth->frame_len, crc, WEP_ICV_LEN);
     print_hex(frameicv, frameicv_len);
 
-    unsigned char out[256];
+    unsigned char out[WEP_PAYLOAD_MAX+WEP_ICV_LEN];
     int out_len = 0;
     unsigned char iv[EVP_MAX_IV_LENGTH] = { 0 };
     int encrypt = 1;
-    bool rv = ssl_crypt(EVP_rc4(), out, &out_len, frameicv, frameicv_len,
-                        ivkey, ivkey_len, iv, encrypt);
+    bool crypt_ok = ssl_crypt(EVP_rc4(), out, &out_len, frameicv, frameicv_len,
+                              ivkey, ivkey_len, iv, encrypt);
+    assert(crypt_ok);
     assert((unsigned int)out_len == frameicv_len);
     assert(frameicv_len == auth->data_len);
 
-    fprintf(stderr, "rc4 (%s) -> %u\n", BOOL2STR(rv), out_len);
+    fprintf(stderr, "rc4 (%s) -> %u\n", BOOL2STR(crypt_ok), out_len);
     print_hex(out, out_len);
 
     return (!memcmp(out, auth->data, auth->data_len));
 }
 
-// TODO: ...and this is why we'll be only working on data
-bool wep_check_key_data(const unsigned char *key, unsigned int key_len) {
+bool wep_check_key_data(const struct wep_data *auth,
+                        const unsigned char *key, unsigned int key_len) {
     assert(key_len == WEP_KEY_LEN);
 
-    /* def isValidKey(self,key,wepdatapkt): */
-      /*   c=ARC4.new(wepdatapkt[Dot11WEP].iv+key) */
-      /*   dataICV=c.decrypt(str(wepdatapkt)[-4-len(wepdatapkt.wepdata):]) */
-      /*   data=dataICV[:-4] */
-      /*   icv=dataICV[-4:] */
-      /*   if crc32(data) in struct.unpack('<l',icv): */
-      /*     return True */
-      /*   else: */
-      /*     return False */
+    unsigned int ivkey_len = WEP_IV_LEN + key_len;
+    unsigned char ivkey[ivkey_len];
+    compute_ivkey(ivkey, auth->iv, key, key_len);
 
-    return true;
+    unsigned char out[WEP_PAYLOAD_MAX+WEP_ICV_LEN];
+    int out_len = 0;
+    unsigned char iv[EVP_MAX_IV_LENGTH] = { 0 };
+    int encrypt = 0;
+    bool decrypt_ok = ssl_crypt(EVP_rc4(), out, &out_len, auth->data, auth->data_len,
+                                ivkey, ivkey_len, iv, encrypt);
+    assert(decrypt_ok);
+    assert((unsigned int)out_len == auth->data_len);
+
+    unsigned int data_len = out_len - WEP_ICV_LEN;
+    unsigned char crc[WEP_ICV_LEN];
+    compute_crc(crc, out, data_len);
+    print_hex(crc, WEP_ICV_LEN);
+
+    unsigned char icv[WEP_ICV_LEN];
+    memcpy(icv, out + data_len, WEP_ICV_LEN);
+    print_hex(icv, WEP_ICV_LEN);
+
+    return (!memcmp(crc, icv, WEP_ICV_LEN));
 }
