@@ -4,7 +4,8 @@
 #include "utils.h"
 
 struct gen_ctx *gen_ctx_create(const char *a, const unsigned a_len,
-                               const unsigned pw_len) {
+                               const unsigned pw_len)
+{
     struct gen_ctx *ctx = malloc(sizeof(struct gen_ctx));
     ctx->alpha_len = a_len;
     ctx->alpha = calloc(ctx->alpha_len, sizeof(char));
@@ -14,13 +15,15 @@ struct gen_ctx *gen_ctx_create(const char *a, const unsigned a_len,
     return ctx;
 }
 
-void gen_ctx_destroy(struct gen_ctx *ctx) {
+void gen_ctx_destroy(struct gen_ctx *ctx)
+{
     free(ctx->alpha);
     free(ctx);
 }
 
 void gen_apply_on_range(struct gen_ctx *ctx, gen_apply_fn fun,
-                        unsigned long long from, unsigned long long until) {
+                        unsigned long long from, unsigned long long until)
+{
     unsigned char pw[ctx->pw_len];
     memset(pw, 0, ctx->pw_len);
 

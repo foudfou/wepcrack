@@ -6,13 +6,15 @@
 #include "wep.h"
 
 static void compute_ivkey(unsigned char *ivkey, const unsigned char *iv,
-                       const unsigned char *key, const unsigned int key_len) {
+                          const unsigned char *key, const unsigned int key_len)
+{
     memcpy(ivkey, iv, WEP_IV_LEN);
     memcpy(ivkey + WEP_IV_LEN, key, key_len);
 }
 
 static void compute_crc(unsigned char *crc,
-                     const unsigned char *frame, const unsigned int frame_len) {
+                        const unsigned char *frame, const unsigned int frame_len)
+{
     uint32_t crc_raw = crc32(frame, frame_len);
     *(uint32_t *)crc = crc_raw;
 }
@@ -22,7 +24,8 @@ static void compute_crc(unsigned char *crc,
  * input with the RC4 PRNG derived from a key.
  */
 bool wep_check_key_auth(const struct wep_data *auth,
-                        const unsigned char *key, unsigned int key_len) {
+                        const unsigned char *key, unsigned int key_len)
+{
     assert(key_len == WEP_KEY_LEN);
 
     unsigned int ivkey_len = WEP_IV_LEN + key_len;
@@ -52,7 +55,8 @@ bool wep_check_key_auth(const struct wep_data *auth,
 }
 
 bool wep_check_key_data(const struct wep_data *auth,
-                        const unsigned char *key, unsigned int key_len) {
+                        const unsigned char *key, unsigned int key_len)
+{
     assert(key_len == WEP_KEY_LEN);
 
     unsigned int ivkey_len = WEP_IV_LEN + key_len;

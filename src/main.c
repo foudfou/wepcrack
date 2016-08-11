@@ -31,7 +31,8 @@
 "\xf0\xf1\xf2\xf3\xf4\xf5\xf6\xf7\xf8\xf9\xfa\xfb\xfc\xfd\xfe\xff"
 #define ALPHABET_LEN 256
 
-static void wep_check_key_with_data(const unsigned char *key, unsigned len) {
+static void wep_check_key_with_data(const unsigned char *key, unsigned len)
+{
     if (wep_check_key_data(&wep_data2, key, len)) {
         char keyhex[2*WEP_KEY_LEN+1];
         tohex(keyhex, key, WEP_KEY_LEN);
@@ -40,7 +41,8 @@ static void wep_check_key_with_data(const unsigned char *key, unsigned len) {
 }
 
 
-int main(void) {
+int main(void)
+{
     struct gen_ctx *crack_ctx =
         gen_ctx_create(ALPHABET, ALPHABET_LEN, WEP_KEY_LEN);
     gen_apply_fn pw_apply = wep_check_key_with_data;
