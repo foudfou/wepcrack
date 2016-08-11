@@ -30,14 +30,22 @@
 "\xe0\xe1\xe2\xe3\xe4\xe5\xe6\xe7\xe8\xe9\xea\xeb\xec\xed\xee\xef" \
 "\xf0\xf1\xf2\xf3\xf4\xf5\xf6\xf7\xf8\xf9\xfa\xfb\xfc\xfd\xfe\xff"
 #define ALPHABET_LEN 256
-#define PASSWORD_LEN 2
+
+static void wep_check_key_with_data(const unsigned char *key, unsigned len) {
+    if (wep_check_key_data(&wep_data2, key, len)) {
+        char keyhex[2*WEP_KEY_LEN+1];
+        tohex(keyhex, key, WEP_KEY_LEN);
+        printf("!!! KEY FOUND -> 0x%s !!!\n", keyhex);
+    }
+}
+
 
 int main(void) {
     struct gen_ctx *crack_ctx =
-        gen_ctx_create(ALPHABET, ALPHABET_LEN, PASSWORD_LEN);
-    gen_apply_fn pw_apply = print_hex;
+        gen_ctx_create(ALPHABET, ALPHABET_LEN, WEP_KEY_LEN);
+    gen_apply_fn pw_apply = wep_check_key_with_data;
 
-#pragma omp parallel firstprivate(crack_ctx)
+#pragma omp parallel firstprivate(crack_ctx, wep_data2)
     {
         int ithread = omp_get_thread_num();
         int nthreads = omp_get_num_threads();
