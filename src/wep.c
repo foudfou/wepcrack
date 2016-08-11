@@ -5,10 +5,11 @@
 #include "utils.h"
 #include "wep.h"
 
-/* (iv + key = key for RC4/keystream) ^ (challenge + icv/crc32) -> data
- * This is exactly what the openssl RC4() function does.
+/* (iv + key = key for RC4/keystream) ^ (frame header + challenge + icv/crc32)
+ * -> data.  This is exactly what the openssl RC4() function does: xor's some
+ * input with the RC4 PRNG derived from a key.
  */
-void wep_check_key_auth(const struct wep_data_auth *auth,
+bool wep_check_key_auth(const struct wep_data_auth *auth,
                         const unsigned char *key, unsigned int key_len) {
     assert(key_len == WEP_KEY_LEN);
 
@@ -19,7 +20,7 @@ void wep_check_key_auth(const struct wep_data_auth *auth,
     memcpy(ivkey + WEP_IV_LEN, key, key_len);
     print_hex(ivkey, ivkey_len);
 
-    // compute ICV
+    // compute ICV of plain data
     uint32_t crc_raw = crc32(auth->frame, auth->frame_len);
     unsigned char crc[WEP_ICV_LEN];
     *(uint32_t *)crc = crc_raw;
@@ -38,15 +39,17 @@ void wep_check_key_auth(const struct wep_data_auth *auth,
     int encrypt = 1;
     bool rv = ssl_crypt(EVP_rc4(), out, &out_len, frameicv, frameicv_len,
                         ivkey, ivkey_len, iv, encrypt);
-    fprintf(stderr, "rc4 (%s) -> %u\n", rv ? "true" : "false", out_len);
+    assert((unsigned int)out_len == frameicv_len);
+    assert(frameicv_len == auth->data_len);
 
+    fprintf(stderr, "rc4 (%s) -> %u\n", BOOL2STR(rv), out_len);
     print_hex(out, out_len);
 
-    /* TODO: to be continued... */
+    return (!memcmp(out, auth->data, auth->data_len));
 }
 
 // TODO: ...and this is why we'll be only working on data
-void wep_check_key_data(const unsigned char *key, unsigned int key_len) {
+bool wep_check_key_data(const unsigned char *key, unsigned int key_len) {
     assert(key_len == WEP_KEY_LEN);
 
     /* def isValidKey(self,key,wepdatapkt): */
@@ -58,4 +61,6 @@ void wep_check_key_data(const unsigned char *key, unsigned int key_len) {
       /*     return True */
       /*   else: */
       /*     return False */
+
+    return true;
 }

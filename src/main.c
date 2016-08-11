@@ -32,10 +32,13 @@
 #define ALPHABET_LEN 256
 #define PASSWORD_LEN 2
 
-
 int main(void) {
-    wep_check_key_auth(&wep_auth1, (unsigned char*)"tudes", WEP_KEY_LEN);
-    wep_check_key_auth(&wep_auth2, (unsigned char*)"tudes", WEP_KEY_LEN);
+    unsigned char key[WEP_KEY_LEN+1] = {'t','u','d','e','s',0};
+    bool keychk = false;
+    keychk = wep_check_key_auth(&wep_auth1, key, WEP_KEY_LEN);
+    fprintf(stderr, "keychk (%s) -> %s\n", key, BOOL2STR(keychk));
+    keychk = wep_check_key_auth(&wep_auth2, key, WEP_KEY_LEN);
+    fprintf(stderr, "keychk (%s) -> %s\n", key, BOOL2STR(keychk));
     return 0;
 
     struct gen_ctx *crack_ctx =

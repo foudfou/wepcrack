@@ -3,6 +3,8 @@
 
 #include <stdbool.h>
 
+#define BOOL2STR(v) v ? "true" : "false"
+
 unsigned long long powull(unsigned long long base, unsigned long long exp);
 
 void tohex(char *dst, const unsigned char *src, size_t len);
