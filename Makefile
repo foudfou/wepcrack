@@ -42,9 +42,9 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.c
 test: $(TESTS)
 	@sh $(TESTDIR)/runtests.sh
 
-$(TESTS): $(TEST_SRC)
+$(TESTDIR)/%: $(TESTDIR)/%.c
 	@printf "\e[32mBuilding test\e[0m %s\n" $@
-	$(CC) -o $@ $^ $(TEST_OBJ) $(CFLAGS) $(LDFLAGS)
+	$(CC) -o $@ $< $(TEST_OBJ) $(CFLAGS) $(LDFLAGS)
 	@printf "\e[32mTests built\e[0m\n"
 
 valgrind:

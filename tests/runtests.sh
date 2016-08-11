@@ -7,7 +7,7 @@ for i in $path/*_tests
 do
     if test -f $i
     then
-        printf "$i"
+        printf "$i "
         if $VALGRIND ./$i 2>> tests/tests.log
         then
             printf " PASS\n"
