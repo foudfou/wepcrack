@@ -33,16 +33,6 @@
 #define PASSWORD_LEN 2
 
 int main(void) {
-    unsigned char key[WEP_KEY_LEN+1] = {'t','u','d','e','s',0};
-    bool keychk = false;
-    keychk = wep_check_key_auth(&wep_auth1, key, WEP_KEY_LEN);
-    fprintf(stderr, "keychk (%s) -> %s\n", key, BOOL2STR(keychk));
-    keychk = wep_check_key_auth(&wep_auth2, key, WEP_KEY_LEN);
-    fprintf(stderr, "keychk (%s) -> %s\n", key, BOOL2STR(keychk));
-    keychk = wep_check_key_data(&wep_data1, key, WEP_KEY_LEN);
-    fprintf(stderr, "keychk (%s) -> %s\n", key, BOOL2STR(keychk));
-    return 0;
-
     struct gen_ctx *crack_ctx =
         gen_ctx_create(ALPHABET, ALPHABET_LEN, PASSWORD_LEN);
     gen_apply_fn pw_apply = print_hex;

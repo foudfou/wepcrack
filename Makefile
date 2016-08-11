@@ -39,7 +39,7 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.c
 	@printf "\e[36mCompiling\e[0m %s\n" $@
 	@$(CC) -o $@ -c $< $(CFLAGS)
 
-test: $(TESTS)
+test: $(OBJ) $(TESTS)
 	@sh $(TESTDIR)/runtests.sh
 
 $(TESTDIR)/%: $(TESTDIR)/%.c
