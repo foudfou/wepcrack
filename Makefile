@@ -44,8 +44,7 @@ test: $(TESTS)
 
 $(TESTDIR)/%: $(TESTDIR)/%.c
 	@printf "\e[32mBuilding test\e[0m %s\n" $@
-	$(CC) -o $@ $< $(TEST_OBJ) $(CFLAGS) $(LDFLAGS)
-	@printf "\e[32mTests built\e[0m\n"
+	@$(CC) -o $@ $< $(TEST_OBJ) $(CFLAGS) $(LDFLAGS)
 
 valgrind:
 	VALGRIND="valgrind -v --leak-check=full --show-leak-kinds=all \
