@@ -14,7 +14,8 @@ has_clang = $(shell clang --version 2> /dev/null)
 ifeq (, $(has_clang))
 	CC = gcc
 endif
-CFLAGS = -std=c11 -Wall -Wextra -I$(SRCDIR) -fopenmp \
+DEFS = -D _XOPEN_SOURCE=700
+CFLAGS = $(DEFS) -std=c11 -Wall -Wextra -I$(SRCDIR) -fopenmp \
   `pkg-config --cflags openssl`
 LDFLAGS = -lm -fopenmp `pkg-config --libs openssl`
 
@@ -25,7 +26,7 @@ TESTS    = $(patsubst %.c,%,$(TEST_SRC))
 .SUFFIXES:
 .SUFFIXES: .c .o
 
-all: $(TARGET) $(TESTS)
+all: $(TARGET) $(TESTS) test
 
 dev: CFLAGS += -g -pedantic
 dev: all
@@ -42,6 +43,7 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.c
 test: $(OBJ) $(TESTS)
 	@sh $(TESTDIR)/runtests.sh
 
+$(TESTS): $(OBJ)
 $(TESTDIR)/%: $(TESTDIR)/%.c
 	@printf "\e[32mBuilding test\e[0m %s\n" $@
 	@$(CC) -o $@ $< $(TEST_OBJ) $(CFLAGS) $(LDFLAGS)
@@ -54,14 +56,14 @@ valgrind:
 .PHONY: clean distclean
 
 clean:
-	rm -rf $(OBJ) $(TESTS)
-	rm -f $(TESTDIR)/tests.log
-	rm -f /tmp/valgrind-*
-	rm -f $(TESTDIR)/*_tests
-	@printf "\e[34mClean\e[0m\n"&
+	@rm -rf $(OBJ) $(TESTS)
+	@rm -f $(TESTDIR)/tests.log
+	@rm -f /tmp/valgrind-*
+	@rm -f $(TESTDIR)/*_tests
+	@printf "\e[34mCleaned\e[0m\n"&
 
 distclean: clean
-	rm -rf $(TARGET)
+	@rm -rf $(TARGET)
 	@printf "\e[34mAll clear!\e[0m\n"&
 
 
