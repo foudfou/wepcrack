@@ -2,6 +2,7 @@
 #define UTILS_H
 
 #include <stdbool.h>
+#include <stddef.h>
 
 #define BOOL2STR(v) v ? "true" : "false"
 

@@ -1,9 +1,15 @@
 // http://stackoverflow.com/a/23045070/421846
 
+#include <errno.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <omp.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include "bit.h"
 #include "cartesian.h"
+#include "ipc.h"
 #include "utils.h"
 #include "wep.h"
 #include "wep_data.h"
@@ -31,33 +37,135 @@
 "\xf0\xf1\xf2\xf3\xf4\xf5\xf6\xf7\xf8\xf9\xfa\xfb\xfc\xfd\xfe\xff"
 #define ALPHABET_LEN 256
 
+#define EV_SIGUSR1 (1U << 0)
+
+static unsigned int events = 0;
+
+void sig_handler(int signo)
+{
+    switch (signo) {
+    case SIGUSR1:
+        fprintf(stderr, "(%u) got SIGUSR1\n", getpid());
+        fflush (stderr);
+        BIT_SET(events, EV_SIGUSR1);
+        break;
+    case SIGUSR2:
+        fprintf(stderr, "(%u) got SIGUSR2\n", getpid());
+        fflush (stderr);
+        break;
+    case SIGINT :
+        fprintf(stderr, "(%u) got SIGINT\n", getpid());
+        fflush(stderr);
+        break;
+    }
+}
+
+int sig_install(int sig)
+{
+    struct sigaction sa;
+    sa.sa_handler = sig_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    if (sigaction(sig, &sa, NULL) != 0) {
+        perror("sigaction");
+        return(EXIT_FAILURE);
+    }
+    return(EXIT_SUCCESS);
+}
+
+void msg_children(const long nprocs, const int qid)
+{
+    struct msgbuf msg;
+    for (int i = 1; i <= nprocs; i++) {
+        msg.type =  i;
+        snprintf(msg.text, MSG_TEXT_LEN, "hi%d", i);
+        msg_put(qid, &msg);
+    }
+}
+
 static void wep_check_key_with_data(const unsigned char *key, unsigned len)
 {
-    if (wep_check_key_data(&wep_data2, key, len)) {
+    if (wep_check_key_auth(&wep_auth1, key, len)) {
         char keyhex[2*WEP_KEY_LEN+1];
         tohex(keyhex, key, WEP_KEY_LEN);
         printf("!!! KEY FOUND -> 0x%s !!!\n", keyhex);
     }
 }
 
-
-int main(void)
+/* TODO:
+  + add session save/restore
+  + add throttle speed
+ */
+int main(int argc, char *argv[])
 {
-    struct gen_ctx *crack_ctx =
-        gen_ctx_create(ALPHABET, ALPHABET_LEN, WEP_KEY_LEN);
-    gen_apply_fn pw_apply = wep_check_key_with_data;
+    (void)argc;  // unused
 
-#pragma omp parallel firstprivate(crack_ctx, wep_data2)
-    {
-        int ithread = omp_get_thread_num();
-        int nthreads = omp_get_num_threads();
-        unsigned long long from = crack_ctx->total_n*ithread/nthreads;
-        unsigned long long until = crack_ctx->total_n*(ithread + 1)/nthreads;
-        fprintf(stderr, "%u: %lli -> %lli\n", ithread, from, until);
-        gen_apply_on_range(crack_ctx, pw_apply, from, until);
+    long nprocs = sysconf(_SC_NPROCESSORS_ONLN);
+    pid_t pid[nprocs+1];
+
+    sig_install(SIGUSR1);
+    sig_install(SIGUSR2);
+
+    int qid = msg_qid(argv[0]);
+    if (qid != -1) {
+        fprintf(stderr, "Found existing message queue. Cleaning...\n");
+        msg_destroy(qid);
+    }
+    qid = msg_create(argv[0]);
+    if (qid == -1) {
+        fprintf(stderr, "Could not create message queue. Exiting...\n");
+        return(EXIT_FAILURE);
     }
 
-    gen_ctx_destroy(crack_ctx);
+    struct gen_ctx *crack_ctx =
+        gen_ctx_create(ALPHABET, ALPHABET_LEN, WEP_KEY_LEN, qid);
 
-    return 0;
+    gen_apply_fn pw_apply = wep_check_key_with_data;
+    for (int i = 1; i <= nprocs; i++) {
+        pid[i] = fork();
+        if (pid[i] == -1) {
+            perror("fork");
+            return(EXIT_FAILURE);
+        }
+        if (pid[i] == 0) {
+            crack_ctx->msgid = i;
+            unsigned long long from = crack_ctx->total_n*i/nprocs;
+            unsigned long long until = crack_ctx->total_n*(i + 1)/nprocs;
+            fprintf(stderr, "%u: %lli -> %lli\n", i, from, until);
+            gen_apply_on_range(crack_ctx, pw_apply, from, until);
+            return(EXIT_SUCCESS);
+        }
+    }
+
+    pid_t wpid;
+    int wstatus;
+    do {
+        if (BIT_CHK(events, EV_SIGUSR1)) {
+            BIT_CLR(events, EV_SIGUSR1);
+            fprintf(stderr, "(%u) fwd SIGUSR1 to children\n", getpid());
+            msg_children(nprocs, crack_ctx->msgqid);
+        }
+
+        wpid = waitpid(0, &wstatus, WNOHANG | WUNTRACED | WCONTINUED);
+        if (wpid == -1 && errno != EINTR) {
+            perror("waitpid");
+            return(EXIT_FAILURE);
+        }
+
+        if (WIFEXITED(wstatus)) {
+            printf("exited, status=%d\n", WEXITSTATUS(wstatus));
+        } else if (WIFSIGNALED(wstatus)) {
+            printf("killed by signal %d\n", WTERMSIG(wstatus));
+        } else if (WIFSTOPPED(wstatus)) {
+            printf("stopped by signal %d\n", WSTOPSIG(wstatus));
+        } else if (WIFCONTINUED(wstatus)) {
+            printf("continued\n");
+        }
+    }
+    while (!WIFEXITED(wstatus) && !WIFSIGNALED(wstatus));
+
+    gen_ctx_destroy(crack_ctx);
+    msg_destroy(crack_ctx->msgqid);
+
+    return(EXIT_SUCCESS);
 }
