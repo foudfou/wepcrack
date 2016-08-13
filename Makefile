@@ -19,6 +19,12 @@ CFLAGS = $(DEFS) -std=c11 -Wall -Wextra -I$(SRCDIR) -fopenmp \
   `pkg-config --cflags openssl`
 LDFLAGS = -lm -fopenmp `pkg-config --libs openssl`
 
+BUILD_ENV ?= dev
+ifeq ($(BUILD_ENV),release)
+else
+  CFLAGS += -g -pedantic
+endif
+
 TEST_SRC = $(wildcard $(TESTDIR)/*_tests.c)
 TEST_OBJ = $(filter-out $(SRCDIR)/main.o,$(OBJ))
 TESTS    = $(patsubst %.c,%,$(TEST_SRC))
@@ -27,9 +33,6 @@ TESTS    = $(patsubst %.c,%,$(TEST_SRC))
 .SUFFIXES: .c .o
 
 all: $(TARGET) $(TESTS) test
-
-dev: CFLAGS += -g -pedantic
-dev: all
 
 $(TARGET): $(OBJ)
 	@printf "\e[33mLinking\e[0m %s\n" $@
