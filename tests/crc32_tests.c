@@ -3,8 +3,7 @@
  *
  * test vectors from http://dox.ipxe.org/crc32__test_8c.html
  */
-#include <string.h>
-#include <stdio.h>
+#include "test.h"
 #include "crc32.h"
 
 #define TEST_COUNT 6

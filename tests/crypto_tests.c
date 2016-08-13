@@ -4,7 +4,6 @@
  * Adapted from http://patux.net/crypto_programs/sim/rc4/rc4.c.html
  */
 #include <string.h>
-#include <stdio.h>
 #include "crypto_ssl.h"
 
 #define TEST_COUNT 6

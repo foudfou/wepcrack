@@ -1,7 +1,7 @@
 # http://c.learncodethehardway.org/book/ex28.html
 path=${0%%/*}
 
-echo "Running unit tests: "
+printf "Running unit tests: \n\n"
 
 for i in $path/*_tests
 do
@@ -20,4 +20,4 @@ do
     fi
 done
 
-echo ""
+printf "\nAll good!\n"
