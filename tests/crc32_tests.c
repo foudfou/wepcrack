@@ -7,25 +7,31 @@
 #include <stdio.h>
 #include "crc32.h"
 
-#define TEST_COUNT 4
+#define TEST_COUNT 6
 
 static unsigned char data[TEST_COUNT][32] = {
     {0},
+    {0},
+    {11,'h','e','l','l','o',' ','w','o','r','l','d'},
     {11,'h','e','l','l','o',' ','w','o','r','l','d'},
     {5,'h', 'e', 'l', 'l', 'o'},
     {6,' ', 'w', 'o', 'r', 'l', 'd'}
 };
 
 static uint32_t seeds[TEST_COUNT] = {
+    0x0UL,
     0x12345678UL,
     0xffffffffUL,
+    0x0UL,
     0xffffffffUL,
     0xc9ef5979UL
 };
 
 static uint32_t crcs[TEST_COUNT] = {
+    0x0UL,
     0x12345678UL,
     0xf2b5ee7aUL,
+    0x66cda069UL,
     0xc9ef5979UL,
     0xf2b5ee7aUL
 };
