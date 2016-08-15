@@ -115,6 +115,10 @@ int main(void)
 
     struct gen_ctx *crack_ctx =
         gen_ctx_create(ALPHABET, ALPHABET_LEN, WEP_KEY_LEN);
+    if (!crack_ctx) {
+        fprintf(stderr, "Can't create context. Exiting...\n");
+        return(EXIT_FAILURE);
+    }
     gen_apply_fn pw_apply = wep_check_key_with_data;
 
     for (int i = 0; i < nprocs; i++) {

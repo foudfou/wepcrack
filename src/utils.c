@@ -1,16 +1,20 @@
+#include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include "utils.h"
 
+/* Compute the power base^exp over an unsigned long long.
+ * Returns 0 in case of overflow.
+ */
 unsigned long long powull(unsigned long long base, unsigned long long exp)
 {
     unsigned long long result = 1;
-    while (exp > 0) {
-        if (exp & 1)
-            result *= base;
-        base = base * base;
-        exp >>=1;
+    while (exp) {
+        if (ULLONG_MAX / base < result) // overflow
+            return 0;
+        result *= base;
+        exp--;
     }
     return result;
 }

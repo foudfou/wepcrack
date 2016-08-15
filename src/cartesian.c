@@ -1,3 +1,4 @@
+#include <limits.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -7,15 +8,28 @@
 #include "vars.h"
 
 
+/* Returns a new context, or NULL if any of the following occurs: malloc
+ * failure, `total_n` overflow.
+ * The context MUST be free'd with gen_ctx_destroy().
+ */
 struct gen_ctx *gen_ctx_create(const char *a, const unsigned a_len,
                                const unsigned pw_len)
 {
     struct gen_ctx *ctx = malloc(sizeof(struct gen_ctx));
+    if (!ctx) {
+        perror("malloc");
+        return NULL;
+    }
     ctx->alpha_len = a_len;
     ctx->alpha = calloc(ctx->alpha_len, sizeof(char));
     memcpy(ctx->alpha, a, ctx->alpha_len);
     ctx->pw_len = pw_len;
     ctx->total_n = powull(ctx->alpha_len, ctx->pw_len);
+    if (!ctx->total_n) {
+        fprintf(stderr, "Space too big %u^%u (>%llu).\n", a_len, pw_len,
+                ULLONG_MAX);
+        return NULL;
+    }
     return ctx;
 }
 
