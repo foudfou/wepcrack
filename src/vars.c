@@ -1,3 +1,3 @@
 #include "vars.h"
 
-volatile unsigned long int events = 0;
+volatile unsigned long events = 0;
