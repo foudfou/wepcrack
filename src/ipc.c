@@ -7,12 +7,12 @@
 static int msg_queue(const char *path, const int mode)
 {
     key_t msgkey;
-    int msgqid;
     if ((msgkey = ftok(path, MSG_PROJ_ID)) == -1) {
         perror("ftok");
         return(-1);
     }
-    if ((msgqid = msgget(msgkey, mode)) == -1  && errno != ENOENT)
+    int msgqid;
+    if ((msgqid = msgget(msgkey, mode)) == -1 && errno != ENOENT)
         perror("msgget");
 
     return msgqid;
@@ -37,7 +37,7 @@ bool msg_destroy(const int qid)
     return(true);
 }
 
-bool msg_put(const int qid, const struct msgbuf *msg)
+bool msg_put(const int qid, const struct msg *msg)
 {
     if (msgsnd(qid, (void *)msg, sizeof(msg->text), IPC_NOWAIT) == -1) {
         perror("msgsnd");
@@ -46,7 +46,7 @@ bool msg_put(const int qid, const struct msgbuf *msg)
     return(true);
 }
 
-bool msg_get(const int qid, struct msgbuf *msg, const long msgtype)
+bool msg_get(const int qid, struct msg *msg, const long msgtype)
 {
     if (msgrcv(qid, (void *)msg, sizeof(msg->text), msgtype,
                MSG_NOERROR | IPC_NOWAIT) == -1) {

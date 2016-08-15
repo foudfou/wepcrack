@@ -7,7 +7,7 @@
 #define MSG_PROJ_ID 'A'
 #define MSG_TEXT_LEN 80
 
-struct msgbuf {
+struct msg {
     long type;                  // serves as address
     char text[MSG_TEXT_LEN];
 };
@@ -16,7 +16,7 @@ int msg_create(const char *path);
 int msg_qid(const char *path);
 
 bool msg_destroy(const int qid);
-bool msg_put(const int qid, const struct msgbuf *msg);
-bool msg_get(const int qid, struct msgbuf *msg, long msgtype);
+bool msg_put(const int qid, const struct msg *msg);
+bool msg_get(const int qid, struct msg *msg, long msgtype);
 
 #endif /* IPC_H */

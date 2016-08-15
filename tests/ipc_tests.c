@@ -16,9 +16,9 @@ int main(int argc, char *argv[])
     ASSERT_GT(qid, -1);
     ASSERT_EQUAL(qid, msg_qid(argv[0]));
 
-    struct msgbuf msg_s = { 1, "foudil" };
+    struct msg msg_s = { 1, "foudil" };
     ASSERT(msg_put(qid, &msg_s));
-    struct msgbuf msg_r;
+    struct msg msg_r;
     ASSERT(msg_get(qid, &msg_r, msg_s.type));
     ASSERT_EQUAL(strcmp(msg_s.text, msg_r.text), 0);
 

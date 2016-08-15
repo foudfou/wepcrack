@@ -2,6 +2,7 @@
 
 #include <errno.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,12 +12,9 @@
 #include "cartesian.h"
 #include "ipc.h"
 #include "utils.h"
+#include "vars.h"
 #include "wep.h"
 #include "wep_data.h"
-
-/* #define ALPHABET "abcdef" */
-/* #define ALPHABET_LEN 6 */
-/* #define PASSWORD_LEN 4 */
 
 #define ALPHABET                                                   \
 "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f" \
@@ -37,50 +35,62 @@
 "\xf0\xf1\xf2\xf3\xf4\xf5\xf6\xf7\xf8\xf9\xfa\xfb\xfc\xfd\xfe\xff"
 #define ALPHABET_LEN 256
 
-#define EV_SIGUSR1 (1U << 0)
+/* #define ALPHABET "abcdef" */
+/* #define ALPHABET_LEN 6 */
+/* #define PASSWORD_LEN 4 */
 
-static unsigned int events = 0;
+
+/* static void print_pw(const unsigned char *key, unsigned len) */
+/* { */
+/*     char str[PASSWORD_LEN]; */
+/*     snprintf(str, PASSWORD_LEN + 1, "%s", key); */
+/*     printf("%s\n", str); */
+/* } */
 
 void sig_handler(int signo)
 {
     switch (signo) {
     case SIGUSR1:
-        fprintf(stderr, "(%u) got SIGUSR1\n", getpid());
-        fflush (stderr);
         BIT_SET(events, EV_SIGUSR1);
         break;
-    case SIGUSR2:
-        fprintf(stderr, "(%u) got SIGUSR2\n", getpid());
-        fflush (stderr);
-        break;
-    case SIGINT :
-        fprintf(stderr, "(%u) got SIGINT\n", getpid());
-        fflush(stderr);
+    case SIGINT:
+    case SIGHUP:
+    case SIGQUIT:
+    case SIGTERM:
+        BIT_SET(events, EV_SIGINT);
         break;
     }
 }
 
-int sig_install(int sig)
+bool sig_install()
 {
+    int sig[][2] = {
+        {SIGUSR1, SA_RESTART},
+        {SIGINT,  SA_RESTART},
+        {SIGHUP,  SA_RESTART},
+        {SIGQUIT, SA_RESTART},
+        {SIGTERM, SA_RESTART},
+    };
+    int len = sizeof(sig) / sizeof(int) / 2;
+
     struct sigaction sa;
     sa.sa_handler = sig_handler;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART;
-    if (sigaction(sig, &sa, NULL) != 0) {
-        perror("sigaction");
-        return(EXIT_FAILURE);
+    for (int i = 0; i < len; i++) {
+        sigemptyset(&sa.sa_mask);
+        sa.sa_flags = sig[i][1];
+        if (sigaction(sig[i][0], &sa, NULL) != 0) {
+            perror("sigaction");
+            return(false);
+        }
     }
-    return(EXIT_SUCCESS);
+
+    return(true);
 }
 
-void msg_children(const long nprocs, const int qid)
+void sig_children(const pid_t *pid, const long nprocs, const int sig)
 {
-    struct msgbuf msg;
-    for (int i = 1; i <= nprocs; i++) {
-        msg.type =  i;
-        snprintf(msg.text, MSG_TEXT_LEN, "hi%d", i);
-        msg_put(qid, &msg);
-    }
+    for (int i = 0; i < nprocs; i++)
+        kill(pid[i], sig);
 }
 
 static void wep_check_key_with_data(const unsigned char *key, unsigned len)
@@ -96,39 +106,26 @@ static void wep_check_key_with_data(const unsigned char *key, unsigned len)
   + add session save/restore
   + add throttle speed
  */
-int main(int argc, char *argv[])
+int main(void)
 {
-    (void)argc;  // unused
-
     long nprocs = sysconf(_SC_NPROCESSORS_ONLN);
-    pid_t pid[nprocs+1];
+    pid_t pid[nprocs];
 
-    sig_install(SIGUSR1);
-    sig_install(SIGUSR2);
-
-    int qid = msg_qid(argv[0]);
-    if (qid != -1) {
-        fprintf(stderr, "Found existing message queue. Cleaning...\n");
-        msg_destroy(qid);
-    }
-    qid = msg_create(argv[0]);
-    if (qid == -1) {
-        fprintf(stderr, "Could not create message queue. Exiting...\n");
-        return(EXIT_FAILURE);
-    }
+    sig_install();
 
     struct gen_ctx *crack_ctx =
-        gen_ctx_create(ALPHABET, ALPHABET_LEN, WEP_KEY_LEN, qid);
-
+        gen_ctx_create(ALPHABET, ALPHABET_LEN, WEP_KEY_LEN);
     gen_apply_fn pw_apply = wep_check_key_with_data;
-    for (int i = 1; i <= nprocs; i++) {
+
+    for (int i = 0; i < nprocs; i++) {
         pid[i] = fork();
         if (pid[i] == -1) {
             perror("fork");
             return(EXIT_FAILURE);
         }
         if (pid[i] == 0) {
-            crack_ctx->msgid = i;
+            crack_ctx->task_id = i;
+
             unsigned long long from = crack_ctx->total_n*i/nprocs;
             unsigned long long until = crack_ctx->total_n*(i + 1)/nprocs;
             fprintf(stderr, "%u: %lli -> %lli\n", i, from, until);
@@ -139,33 +136,40 @@ int main(int argc, char *argv[])
 
     pid_t wpid;
     int wstatus;
-    do {
+    int sigint = 0;
+    for (;;) {
         if (BIT_CHK(events, EV_SIGUSR1)) {
             BIT_CLR(events, EV_SIGUSR1);
-            fprintf(stderr, "(%u) fwd SIGUSR1 to children\n", getpid());
-            msg_children(nprocs, crack_ctx->msgqid);
+            sig_children(pid, nprocs, SIGUSR1);
+        }
+        if (BIT_CHK(events, EV_SIGINT)) {
+            BIT_CLR(events, EV_SIGINT);
+            sigint += 1;
+            if (sigint > 1) {
+                sig_children(pid, nprocs, SIGINT);
+                // TODO: save state
+                break;
+            }
+            fprintf(stderr, "Asked for termination."
+                    " Hit a second time to quit.\n");
         }
 
-        wpid = waitpid(0, &wstatus, WNOHANG | WUNTRACED | WCONTINUED);
-        if (wpid == -1 && errno != EINTR) {
-            perror("waitpid");
-            return(EXIT_FAILURE);
-        }
-
-        if (WIFEXITED(wstatus)) {
-            printf("exited, status=%d\n", WEXITSTATUS(wstatus));
-        } else if (WIFSIGNALED(wstatus)) {
-            printf("killed by signal %d\n", WTERMSIG(wstatus));
-        } else if (WIFSTOPPED(wstatus)) {
-            printf("stopped by signal %d\n", WSTOPSIG(wstatus));
-        } else if (WIFCONTINUED(wstatus)) {
-            printf("continued\n");
+        wpid = waitpid(0, &wstatus, WNOHANG);
+        if (wpid == -1) {
+            if (errno == ECHILD) {
+                fprintf(stderr, "All proceseses ended.\n");
+                break;
+            }
+            if (errno != EINTR) {
+                perror("waitpid");
+                return(EXIT_FAILURE);
+            }
         }
     }
-    while (!WIFEXITED(wstatus) && !WIFSIGNALED(wstatus));
+
+    fprintf(stderr,"Main done!\n");
 
     gen_ctx_destroy(crack_ctx);
-    msg_destroy(crack_ctx->msgqid);
 
     return(EXIT_SUCCESS);
 }

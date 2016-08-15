@@ -13,12 +13,11 @@ struct gen_ctx
     unsigned            pw_len;
     unsigned            alpha_len;
     unsigned long long  total_n;
-    int                 msgqid;
-    long                msgid;
+    int                 task_id;
 };
 
 struct gen_ctx *gen_ctx_create(const char *a, const unsigned a_len,
-                               const unsigned pw_len, const int qid);
+                               const unsigned pw_len);
 
 void gen_ctx_destroy(struct gen_ctx *ctx);
 
