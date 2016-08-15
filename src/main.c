@@ -10,7 +10,6 @@
 #include <unistd.h>
 #include "bit.h"
 #include "cartesian.h"
-#include "ipc.h"
 #include "utils.h"
 #include "vars.h"
 #include "wep.h"
@@ -35,17 +34,6 @@
 "\xf0\xf1\xf2\xf3\xf4\xf5\xf6\xf7\xf8\xf9\xfa\xfb\xfc\xfd\xfe\xff"
 #define ALPHABET_LEN 256
 
-/* #define ALPHABET "abcdef" */
-/* #define ALPHABET_LEN 6 */
-/* #define PASSWORD_LEN 4 */
-
-
-/* static void print_pw(const unsigned char *key, unsigned len) */
-/* { */
-/*     char str[PASSWORD_LEN]; */
-/*     snprintf(str, PASSWORD_LEN + 1, "%s", key); */
-/*     printf("%s\n", str); */
-/* } */
 
 void sig_handler(int signo)
 {
@@ -101,6 +89,7 @@ static void wep_check_key_with_data(const unsigned char *key, unsigned len)
         printf("!!! KEY FOUND -> 0x%s !!!\n", keyhex);
     }
 }
+
 
 /* TODO:
   + add session save/restore
