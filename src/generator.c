@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include "cartesian.h"
+#include "generator.h"
 #include "bit.h"
 #include "utils.h"
 #include "vars.h"

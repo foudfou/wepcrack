@@ -9,7 +9,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include "bit.h"
-#include "cartesian.h"
+#include "generator.h"
 #include "utils.h"
 #include "vars.h"
 #include "wep.h"
