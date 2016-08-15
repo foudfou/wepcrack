@@ -38,6 +38,9 @@
 void sig_handler(int signo)
 {
     switch (signo) {
+    case SIGALRM:
+        BIT_SET(events, EV_SIGALRM);
+        break;
     case SIGUSR1:
         BIT_SET(events, EV_SIGUSR1);
         break;
@@ -53,6 +56,7 @@ void sig_handler(int signo)
 bool sig_install()
 {
     int sig[][2] = {
+        {SIGALRM, SA_RESTART},
         {SIGUSR1, SA_RESTART},
         {SIGINT,  SA_RESTART},
         {SIGHUP,  SA_RESTART},
@@ -93,7 +97,6 @@ static void wep_check_key_with_data(const unsigned char *key, unsigned len)
 
 /* TODO:
   + add session save/restore
-  + add throttle speed
  */
 int main(void)
 {

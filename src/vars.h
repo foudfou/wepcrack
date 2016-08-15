@@ -6,6 +6,7 @@
 #define EV_SIGQUIT  2
 #define EV_SIGTERM  3
 #define EV_SIGUSR1  8
+#define EV_SIGALRM  9
 
 extern volatile unsigned long events;
 

@@ -2,11 +2,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 #include "cartesian.h"
 #include "bit.h"
 #include "utils.h"
 #include "vars.h"
 
+#define THRL_DELAY 5
 
 /* Returns a new context, or NULL if any of the following occurs: malloc
  * failure, `total_n` overflow.
@@ -46,16 +48,27 @@ void gen_apply_on_range(struct gen_ctx *ctx, gen_apply_fn fun,
     memset(pw, 0, ctx->pw_len);
 
     unsigned long long i, j;
+    unsigned long long ilast = from;
+    unsigned long long thrl;
+    alarm(THRL_DELAY);
     for (i = from; i < until; ++i) {
         if (BIT_CHK(events, EV_SIGUSR1)) {
             BIT_CLR(events, EV_SIGUSR1);
-            fprintf(stderr, "(%d) currently at %llu.\n", ctx->task_id, i);
+            fprintf(stderr, "(%d) currently at %llu (%llu keys/s).\n",
+                    ctx->task_id, i, thrl);
         }
         if (BIT_CHK(events, EV_SIGINT)) {
             BIT_CLR(events, EV_SIGINT);
             fprintf(stderr, "(%d) saving state.\n", ctx->task_id);
             // TODO: save state and return;
         }
+        if (BIT_CHK(events, EV_SIGALRM)) {
+            BIT_CLR(events, EV_SIGALRM);
+            thrl = (i - ilast) / THRL_DELAY;
+            ilast = i;
+            alarm(THRL_DELAY);
+        }
+
         unsigned long long n = i;
         for (j = 0; j < ctx->pw_len; ++j){
             pw[ctx->pw_len -j -1] = ctx->alpha[n % ctx->alpha_len];
