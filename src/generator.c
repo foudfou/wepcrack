@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include "generator.h"
 #include "bit.h"
+#include "ipc.h"
 #include "utils.h"
 #include "vars.h"
 
@@ -15,7 +16,7 @@
  * The context MUST be free'd with gen_ctx_destroy().
  */
 struct gen_ctx *gen_ctx_create(const char *a, const unsigned a_len,
-                               const unsigned pw_len)
+                               const unsigned pw_len, const int qid)
 {
     struct gen_ctx *ctx = malloc(sizeof(struct gen_ctx));
     if (!ctx) {
@@ -32,6 +33,7 @@ struct gen_ctx *gen_ctx_create(const char *a, const unsigned a_len,
                 ULLONG_MAX);
         return NULL;
     }
+    ctx->msgqid = qid;
     return ctx;
 }
 
@@ -58,7 +60,13 @@ void gen_apply(struct gen_ctx *ctx, gen_apply_fn fun)
         if (BIT_CHK(events, EV_SIGINT)) {
             BIT_CLR(events, EV_SIGINT);
             fprintf(stderr, "(%d) saving state.\n", ctx->state.task_id);
-            // TODO: save state and return;
+            struct msg_buf state_msg;
+            state_msg.type = MSG_TYPE_TASK_STATE;
+            snprintf(state_msg.text, MSG_TEXT_LEN, "hi%d", ctx->state.task_id);
+            if (!msg_put(ctx->msgqid, &state_msg))
+                /* FIXME: dump ctx->state to screen */
+                fprintf(stderr, "ERROR: could not send state to parent\n");
+            return;
         }
         if (BIT_CHK(events, EV_SIGALRM)) {
             BIT_CLR(events, EV_SIGALRM);

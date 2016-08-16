@@ -16,13 +16,13 @@ int main(int argc, char *argv[])
     ASSERT_GT(qid, -1);
     ASSERT_EQUAL(qid, msg_qid(argv[0]));
 
-    struct msg msg_s = { 1, "foudil" };
+    struct msg_buf msg_s = { 1, "foudil" };
     ASSERT(msg_put(qid, &msg_s));
-    struct msg msg_r;
-    ASSERT(msg_get(qid, &msg_r, msg_s.type));
+    struct msg_buf msg_r;
+    ASSERT_EQUAL(msg_get(qid, &msg_r, msg_s.type), MSG_TEXT_LEN);
     ASSERT_EQUAL(strcmp(msg_s.text, msg_r.text), 0);
 
-    ASSERT(!msg_get(qid, &msg_r, msg_r.type));
+    ASSERT_EQUAL(msg_get(qid, &msg_r, msg_r.type), -1);
 
     ASSERT(msg_destroy(qid));
     ASSERT_EQUAL(msg_qid(argv[0]), -1);

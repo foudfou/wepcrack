@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include "bit.h"
 #include "generator.h"
+#include "ipc.h"
 #include "utils.h"
 #include "vars.h"
 #include "wep.h"
@@ -44,12 +45,14 @@ void sig_handler(int signo)
     case SIGUSR1:
         BIT_SET(events, EV_SIGUSR1);
         break;
-    case SIGINT:
+    case SIGTERM: /* ^\ */
+    case SIGQUIT: /* ^\ */
     case SIGHUP:
-    case SIGQUIT:
-    case SIGTERM:
+    case SIGINT:  /* ^C */
         BIT_SET(events, EV_SIGINT);
         break;
+    default:
+        fprintf(stderr, "caught unhandled %d\n", signo);
     }
 }
 
@@ -61,7 +64,7 @@ bool sig_install()
         {SIGINT,  SA_RESTART},
         {SIGHUP,  SA_RESTART},
         {SIGQUIT, SA_RESTART},
-        {SIGTERM, SA_RESTART},
+        {SIGTERM, SA_RESTART}
     };
     int len = sizeof(sig) / sizeof(int) / 2;
 
@@ -79,10 +82,42 @@ bool sig_install()
     return(true);
 }
 
-void sig_children(const pid_t *pid, const long nprocs, const int sig)
+void sig_children(const pid_t *pids, const int nprocs, const int sig)
 {
     for (int i = 0; i < nprocs; i++)
-        kill(pid[i], sig);
+        kill(pids[i], sig);
+}
+
+int msg_install(const char *path)
+{
+   int qid = msg_qid(path);
+   if (qid != -1) {
+       fprintf(stderr, "Found existing message queue. Cleaning...\n");
+       struct msg_buf _;
+       while (msg_get_sync(qid, &_, 0) > 0);
+   }
+   else {
+       qid = msg_create(path);
+       if (qid == -1) {
+           fprintf(stderr, "Could not create message queue. Exiting...\n");
+           return(EXIT_FAILURE);
+       }
+   }
+   return qid;
+}
+
+int state_save(const int qid, const int nprocs)
+{
+    int msg_count = 0;
+    // TODO: add timeout
+    struct msg_buf msg;
+    while (msg_count < nprocs) {
+        if (msg_get_sync(qid, &msg, 0) > 0) {
+            msg_count += 1;
+            fprintf(stderr, "main got msg: %s\n", msg.text);
+        }
+    }
+    return 0;
 }
 
 static void wep_check_key_with_data(const unsigned char *key, unsigned len)
@@ -98,15 +133,20 @@ static void wep_check_key_with_data(const unsigned char *key, unsigned len)
 /* TODO:
   + add session save/restore
  */
-int main(void)
+int main(int argc, char *argv[])
 {
-    long nprocs = sysconf(_SC_NPROCESSORS_ONLN);
-    pid_t pid[nprocs];
+    (void)argc;  // unused
 
+    int nprocs = sysconf(_SC_NPROCESSORS_ONLN);
+    pid_t pids[nprocs];
+
+    /* We install the handler before forking, so the children inherit it. */
     sig_install();
+    /* The msg queue will be used to pass children's state to the parent. */
+    int qid = msg_install(argv[0]);
 
     struct gen_ctx *crack_ctx =
-        gen_ctx_create(ALPHABET, ALPHABET_LEN, WEP_KEY_LEN);
+        gen_ctx_create(ALPHABET, ALPHABET_LEN, WEP_KEY_LEN, qid);
     if (!crack_ctx) {
         fprintf(stderr, "Can't create context. Exiting...\n");
         return(EXIT_FAILURE);
@@ -114,12 +154,17 @@ int main(void)
     gen_apply_fn pw_apply = wep_check_key_with_data;
 
     for (int i = 0; i < nprocs; i++) {
-        pid[i] = fork();
-        if (pid[i] == -1) {
+        pids[i] = fork();
+        if (pids[i] == -1) {
             perror("fork");
             return(EXIT_FAILURE);
         }
-        if (pid[i] == 0) {
+        if (pids[i] == 0) {
+            // we don't want terminal SIGINT (^C) to be sent to children
+            if (setpgid(0, 0) == -1) {
+                perror("setpgid");
+                return(EXIT_FAILURE);
+            }
             crack_ctx->state.task_id = i;
             crack_ctx->state.from = crack_ctx->total_n*i/nprocs;
             crack_ctx->state.until = crack_ctx->total_n*(i + 1)/nprocs;
@@ -137,21 +182,21 @@ int main(void)
     for (;;) {
         if (BIT_CHK(events, EV_SIGUSR1)) {
             BIT_CLR(events, EV_SIGUSR1);
-            sig_children(pid, nprocs, SIGUSR1);
+            sig_children(pids, nprocs, SIGUSR1);
         }
         if (BIT_CHK(events, EV_SIGINT)) {
             BIT_CLR(events, EV_SIGINT);
             sigint += 1;
             if (sigint > 1) {
-                sig_children(pid, nprocs, SIGINT);
-                // TODO: save state
+                sig_children(pids, nprocs, SIGINT);
+                state_save(qid, nprocs);
                 break;
             }
-            fprintf(stderr, "Asked for termination."
+            fprintf(stderr, " Termination request."
                     " Hit a second time to quit.\n");
         }
 
-        wpid = waitpid(0, &wstatus, WNOHANG);
+        wpid = waitpid(-1, &wstatus, WNOHANG);
         if (wpid == -1) {
             if (errno == ECHILD) {
                 fprintf(stderr, "All proceseses ended.\n");
@@ -166,6 +211,7 @@ int main(void)
 
     fprintf(stderr,"Main done!\n");
 
+    msg_destroy(crack_ctx->msgqid);
     gen_ctx_destroy(crack_ctx);
 
     return(EXIT_SUCCESS);

@@ -37,7 +37,7 @@ bool msg_destroy(const int qid)
     return(true);
 }
 
-bool msg_put(const int qid, const struct msg *msg)
+bool msg_put(const int qid, const struct msg_buf *msg)
 {
     if (msgsnd(qid, (void *)msg, sizeof(msg->text), IPC_NOWAIT) == -1) {
         perror("msgsnd");
@@ -46,13 +46,25 @@ bool msg_put(const int qid, const struct msg *msg)
     return(true);
 }
 
-bool msg_get(const int qid, struct msg *msg, const long msgtype)
+static ssize_t
+msg_get_generic(const int qid, struct msg_buf *msg, const long msgtype,
+                const bool async)
 {
-    if (msgrcv(qid, (void *)msg, sizeof(msg->text), msgtype,
-               MSG_NOERROR | IPC_NOWAIT) == -1) {
-        if (errno != ENOMSG)
-            perror("msgrcv");
-        return(false);
-    }
-    return(true);
+    int msgflg = MSG_NOERROR;
+    if (async)
+        msgflg |= IPC_NOWAIT;
+    ssize_t size = msgrcv(qid, (void *)msg, sizeof(msg->text), msgtype, msgflg);
+    if (size == -1 && errno != ENOMSG)
+        perror("msgrcv");
+    return(size);
+}
+
+ssize_t msg_get(const int qid, struct msg_buf *msg, const long msgtype)
+{
+    return msg_get_generic(qid, msg, msgtype, true);
+}
+
+ssize_t msg_get_sync(const int qid, struct msg_buf *msg, const long msgtype)
+{
+    return msg_get_generic(qid, msg, msgtype, false);
 }
