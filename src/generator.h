@@ -7,13 +7,21 @@
 
 typedef void (* gen_apply_fn)(const unsigned char *, unsigned);
 
+struct gen_task_state
+{
+    int                task_id;
+    unsigned long long from;
+    unsigned long long until;
+    unsigned long long cur;
+};
+
 struct gen_ctx
 {
-    char                *alpha;
-    unsigned            pw_len;
-    unsigned            alpha_len;
-    unsigned long long  total_n;
-    int                 task_id;
+    char                  *alpha;
+    unsigned              pw_len;
+    unsigned              alpha_len;
+    unsigned long long    total_n;
+    struct gen_task_state state;
 };
 
 struct gen_ctx *gen_ctx_create(const char *a, const unsigned a_len,
@@ -21,7 +29,6 @@ struct gen_ctx *gen_ctx_create(const char *a, const unsigned a_len,
 
 void gen_ctx_destroy(struct gen_ctx *ctx);
 
-void gen_apply_on_range(struct gen_ctx *ctx, gen_apply_fn fun,
-                        unsigned long long from, unsigned long long until);
+void gen_apply(struct gen_ctx *ctx, gen_apply_fn fun);
 
 #endif /* GENERATOR_H */

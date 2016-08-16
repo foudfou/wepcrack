@@ -41,31 +41,29 @@ void gen_ctx_destroy(struct gen_ctx *ctx)
     free(ctx);
 }
 
-void gen_apply_on_range(struct gen_ctx *ctx, gen_apply_fn fun,
-                        unsigned long long from, unsigned long long until)
+void gen_apply(struct gen_ctx *ctx, gen_apply_fn fun)
 {
     unsigned char pw[ctx->pw_len];
     memset(pw, 0, ctx->pw_len);
 
     unsigned long long i, j;
-    unsigned long long ilast = from;
-    unsigned long long thrl;
+    unsigned long long thrl = 0;
     alarm(THRL_DELAY);
-    for (i = from; i < until; ++i) {
+    for (i = ctx->state.from; i < ctx->state.until; ++i) {
         if (BIT_CHK(events, EV_SIGUSR1)) {
             BIT_CLR(events, EV_SIGUSR1);
             fprintf(stderr, "(%d) currently at %llu (%llu keys/s).\n",
-                    ctx->task_id, i, thrl);
+                    ctx->state.task_id, i, thrl);
         }
         if (BIT_CHK(events, EV_SIGINT)) {
             BIT_CLR(events, EV_SIGINT);
-            fprintf(stderr, "(%d) saving state.\n", ctx->task_id);
+            fprintf(stderr, "(%d) saving state.\n", ctx->state.task_id);
             // TODO: save state and return;
         }
         if (BIT_CHK(events, EV_SIGALRM)) {
             BIT_CLR(events, EV_SIGALRM);
-            thrl = (i - ilast) / THRL_DELAY;
-            ilast = i;
+            thrl = (i - ctx->state.cur) / THRL_DELAY;
+            ctx->state.cur = i;
             alarm(THRL_DELAY);
         }
 

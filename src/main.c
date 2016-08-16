@@ -120,12 +120,13 @@ int main(void)
             return(EXIT_FAILURE);
         }
         if (pid[i] == 0) {
-            crack_ctx->task_id = i;
-
-            unsigned long long from = crack_ctx->total_n*i/nprocs;
-            unsigned long long until = crack_ctx->total_n*(i + 1)/nprocs;
-            fprintf(stderr, "%u: %lli -> %lli\n", i, from, until);
-            gen_apply_on_range(crack_ctx, pw_apply, from, until);
+            crack_ctx->state.task_id = i;
+            crack_ctx->state.from = crack_ctx->total_n*i/nprocs;
+            crack_ctx->state.until = crack_ctx->total_n*(i + 1)/nprocs;
+            crack_ctx->state.cur = crack_ctx->state.from;
+            fprintf(stderr, "%u: %lli -> %lli\n", i, crack_ctx->state.from,
+                    crack_ctx->state.until);
+            gen_apply(crack_ctx, pw_apply);
             return(EXIT_SUCCESS);
         }
     }
