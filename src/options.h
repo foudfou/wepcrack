@@ -3,13 +3,14 @@
 
 #include <limits.h>
 
-struct opts {
+struct opt_def {
     bool restore;
     char *wordlist;
 };
 
-extern struct opts options;
+extern struct opt_def options;
 
-bool args_parse(const int argc, char * const *argv);
+bool opt_parse(const int argc, char * const *argv);
+void opt_clean(void);
 
 #endif /* OPTIONS_H */

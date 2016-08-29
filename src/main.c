@@ -117,14 +117,15 @@ static void wep_check_key_with_data(const unsigned char *key, unsigned len)
  */
 int main(int argc, char *argv[])
 {
-    if (!args_parse(argc, argv)) {
+    if (!opt_parse(argc, argv)) {
+        fprintf(stderr, "Argument error. Exiting.\n");
         return(EXIT_FAILURE);
     }
     if (options.restore) {
         fprintf(stderr, "Restoring...\n");
     }
     if (options.wordlist) {
-        fprintf(stderr, "Dict=%s.\n", options.wordlist);
+        fprintf(stderr, "Dict=%s\n", options.wordlist);
     }
     return(EXIT_SUCCESS);
 
@@ -139,7 +140,7 @@ int main(int argc, char *argv[])
     struct gen_ctx *crack_ctx =
         gen_ctx_create(WEP_ALPHABET, WEP_ALPHABET_LEN, WEP_KEY_LEN, qid);
     if (!crack_ctx) {
-        fprintf(stderr, "Can't create context. Exiting...\n");
+        fprintf(stderr, "Can't create context. Exiting.\n");
         return(EXIT_FAILURE);
     }
     gen_apply_fn pw_apply = wep_check_key_with_data;
@@ -204,6 +205,7 @@ int main(int argc, char *argv[])
 
     msg_destroy(crack_ctx->msgqid);
     gen_ctx_destroy(crack_ctx);
+    opt_clean();
 
     return(EXIT_SUCCESS);
 }

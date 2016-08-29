@@ -1,19 +1,21 @@
 #include <getopt.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "options.h"
 
-struct opts options = {
+struct opt_def options = {
     .restore = false,
     .wordlist = 0,
 };
 
-static struct option opts_long[] = {
+static struct option opt_long[] = {
     {"restore",  no_argument,       0, 'r'},
     {"wordlist", required_argument, 0, 'w'},
     { 0 },
 };
-static char *opts_def = "hrw:";
+static char *opt_str = "hrw:";
 
 static void usage()
 {
@@ -23,14 +25,24 @@ static void usage()
   printf("  -w, --wordlist DICTFILE\n");
 }
 
-bool args_parse(const int argc, char * const *argv)
+static bool opt_check(void)
+{
+    if (options.restore && options.wordlist) {
+        fprintf(stderr, "ERROR: -r and -w can't be used together.\n");
+        return false;
+    }
+
+    return true;
+}
+
+bool opt_parse(const int argc, char * const *argv)
 {
     extern char *optarg;
     extern int optind, opterr, optopt;
     int ret = 0, cont = 1;
 
     do {
-        ret = getopt_long(argc, argv, opts_def, opts_long, 0);
+        ret = getopt_long(argc, argv, opt_str, opt_long, 0);
         switch (ret) {
         case '?':
             usage();
@@ -45,7 +57,12 @@ bool args_parse(const int argc, char * const *argv)
             options.restore = true;
             break;
         case 'w':
-            options.wordlist = optarg;
+            options.wordlist = (char *)malloc(strlen(optarg) + 1);
+            if (!options.wordlist) {
+                perror("malloc");
+                return false;
+            }
+            strcpy(options.wordlist, optarg);
             break;
         }
     } while (cont);
@@ -55,6 +72,14 @@ bool args_parse(const int argc, char * const *argv)
         // TODO:
     }
 
+    if (!opt_check())
+        return false;
 
     return true;
+}
+
+void opt_clean(void)
+{
+    if (options.wordlist)
+        free(options.wordlist);
 }
