@@ -11,6 +11,7 @@
 #include "bit.h"
 #include "generator.h"
 #include "ipc.h"
+#include "options.h"
 #include "utils.h"
 #include "vars.h"
 #include "wep.h"
@@ -116,7 +117,16 @@ static void wep_check_key_with_data(const unsigned char *key, unsigned len)
  */
 int main(int argc, char *argv[])
 {
-    (void)argc;  // unused
+    if (!args_parse(argc, argv)) {
+        return(EXIT_FAILURE);
+    }
+    if (options.restore) {
+        fprintf(stderr, "Restoring...\n");
+    }
+    if (options.wordlist) {
+        fprintf(stderr, "Dict=%s.\n", options.wordlist);
+    }
+    return(EXIT_SUCCESS);
 
     int nprocs = sysconf(_SC_NPROCESSORS_ONLN);
     pid_t pids[nprocs];
