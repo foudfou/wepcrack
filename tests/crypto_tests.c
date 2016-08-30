@@ -59,13 +59,13 @@ int main(void)
 
         if (!rv || memcmp(cipher, output[i], data_len[i])) {
             printf("E");
-            return(1);
+            return 1;
         }
 
         printf(".");
     }
 
-    return(0);
+    return 0;
 }
 
 #undef TEST_COUNT

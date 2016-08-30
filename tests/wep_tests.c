@@ -26,5 +26,5 @@ int main(void)
     unsigned char key3[WEP_KEY_LEN] = {0xc0,0x00,0xfe,0x4c,0xb1};
     ASSERT(wep_check_key_data(&wep_data1, key3, WEP_KEY_LEN));
 
-    return(0);
+    return 0;
 }

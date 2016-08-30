@@ -9,7 +9,7 @@ static int msg_queue(const char *path, const int mode)
     key_t msgkey;
     if ((msgkey = ftok(path, MSG_PROJ_ID)) == -1) {
         perror("ftok");
-        return(-1);
+        return -1;
     }
     int msgqid;
     if ((msgqid = msgget(msgkey, mode)) == -1 && errno != ENOENT)
@@ -32,18 +32,18 @@ bool msg_destroy(const int qid)
 {
     if (msgctl(qid, IPC_RMID, NULL) == -1) {
         perror ("msgctl");
-        return(false);
+        return false;
     }
-    return(true);
+    return true;
 }
 
 bool msg_put(const int qid, const struct msg_buf *msg)
 {
     if (msgsnd(qid, (void *)msg, sizeof(msg->text), IPC_NOWAIT) == -1) {
         perror("msgsnd");
-        return(false);
+        return false;
     }
-    return(true);
+    return true;
 }
 
 static ssize_t
@@ -56,7 +56,7 @@ msg_get_generic(const int qid, struct msg_buf *msg, const long msgtype,
     ssize_t size = msgrcv(qid, (void *)msg, sizeof(msg->text), msgtype, msgflg);
     if (size == -1 && errno != ENOMSG)
         perror("msgrcv");
-    return(size);
+    return size;
 }
 
 ssize_t msg_get(const int qid, struct msg_buf *msg, const long msgtype)

@@ -27,5 +27,5 @@ int main(int argc, char *argv[])
     ASSERT(msg_destroy(qid));
     ASSERT_EQUAL(msg_qid(argv[0]), -1);
 
-    return(0);
+    return 0;
 }

@@ -8,7 +8,7 @@
     }                 \
     else {            \
         printf("E");  \
-        return(1);    \
+        return 1;     \
     }                 \
 
 #define ASSERT(expr) if (expr) ASSERT_BODY

@@ -57,11 +57,11 @@ bool sig_install()
         sa.sa_flags = sig[i][1];
         if (sigaction(sig[i][0], &sa, NULL) != 0) {
             perror("sigaction");
-            return(false);
+            return false;
         }
     }
 
-    return(true);
+    return true;
 }
 
 void sig_children(const pid_t *pids, const int nprocs, const int sig)
@@ -82,7 +82,7 @@ int msg_install(const char *path)
        qid = msg_create(path);
        if (qid == -1) {
            fprintf(stderr, "Could not create message queue. Exiting...\n");
-           return(EXIT_FAILURE);
+           return EXIT_FAILURE;
        }
    }
    return qid;
@@ -119,7 +119,7 @@ int main(int argc, char *argv[])
 {
     if (!opt_parse(argc, argv)) {
         fprintf(stderr, "Argument error. Exiting.\n");
-        return(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
     if (options.restore) {
         fprintf(stderr, "Restoring...\n");
@@ -127,7 +127,7 @@ int main(int argc, char *argv[])
     if (options.wordlist) {
         fprintf(stderr, "Dict=%s\n", options.wordlist);
     }
-    return(EXIT_SUCCESS);
+    return EXIT_SUCCESS;
 
     int nprocs = sysconf(_SC_NPROCESSORS_ONLN);
     pid_t pids[nprocs];
@@ -141,7 +141,7 @@ int main(int argc, char *argv[])
         gen_ctx_create(WEP_ALPHABET, WEP_ALPHABET_LEN, WEP_KEY_LEN, qid);
     if (!crack_ctx) {
         fprintf(stderr, "Can't create context. Exiting.\n");
-        return(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
     gen_apply_fn pw_apply = wep_check_key_with_data;
 
@@ -149,13 +149,14 @@ int main(int argc, char *argv[])
         pids[i] = fork();
         if (pids[i] == -1) {
             perror("fork");
-            return(EXIT_FAILURE);
+            return EXIT_FAILURE;
         }
+
         if (pids[i] == 0) {
             // we don't want terminal SIGINT (^C) to be sent to children
             if (setpgid(0, 0) == -1) {
                 perror("setpgid");
-                return(EXIT_FAILURE);
+                return EXIT_FAILURE;
             }
             crack_ctx->state.task_id = i;
             crack_ctx->state.from = crack_ctx->total_n*i/nprocs;
@@ -164,7 +165,7 @@ int main(int argc, char *argv[])
             fprintf(stderr, "%u: %lli -> %lli\n", i, crack_ctx->state.from,
                     crack_ctx->state.until);
             gen_apply(crack_ctx, pw_apply);
-            return(EXIT_SUCCESS);
+            return EXIT_SUCCESS;
         }
     }
 
@@ -196,7 +197,7 @@ int main(int argc, char *argv[])
             }
             if (errno != EINTR) {
                 perror("waitpid");
-                return(EXIT_FAILURE);
+                return EXIT_FAILURE;
             }
         }
     }
@@ -207,5 +208,5 @@ int main(int argc, char *argv[])
     gen_ctx_destroy(crack_ctx);
     opt_clean();
 
-    return(EXIT_SUCCESS);
+    return EXIT_SUCCESS;
 }

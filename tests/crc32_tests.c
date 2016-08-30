@@ -41,12 +41,12 @@ int main(void)
         uint32_t crc = crc32_update(seeds[i], &data[i][1], data[i][0]);
         if (crc != crcs[i]) {
             printf("E");
-            return(1);
+            return 1;
         }
         printf(".");
     }
 
-    return(0);
+    return 0;
 }
 
 #undef TEST_COUNT
