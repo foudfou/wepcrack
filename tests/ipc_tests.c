@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
     ASSERT_EQUAL(msg_get(qid, &msg_r, msg_s.type), MSG_TEXT_LEN);
     ASSERT_EQUAL(strcmp(msg_s.text, msg_r.text), 0);
 
-    ASSERT_EQUAL(msg_get(qid, &msg_r, msg_r.type), -1);
+    ASSERT_EQUAL(msg_get(qid, &msg_r, msg_r.type), -2);
 
     ASSERT(msg_destroy(qid));
     ASSERT_EQUAL(msg_qid(argv[0]), -1);

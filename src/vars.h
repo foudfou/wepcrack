@@ -10,6 +10,4 @@
 
 extern volatile unsigned long events;
 
-#define MSG_TYPE_TASK_STATE 0x10
-
 #endif /* VARS_H */

@@ -6,6 +6,7 @@
 
 #define MSG_PROJ_ID 'A'
 #define MSG_TEXT_LEN 80
+#define MSG_TYPE_TASK_STATE 0x0
 
 struct msg_buf {
     long type;                  // serves as address

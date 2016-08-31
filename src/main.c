@@ -76,7 +76,7 @@ int msg_install(const char *path)
    if (qid != -1) {
        fprintf(stderr, "Found existing message queue. Cleaning...\n");
        struct msg_buf _;
-       while (msg_get_sync(qid, &_, 0) > 0);
+       while (msg_get(qid, &_, 0) > 0);
    }
    else {
        qid = msg_create(path);
@@ -117,6 +117,8 @@ static void wep_check_key_with_data(const unsigned char *key, unsigned len)
  */
 int main(int argc, char *argv[])
 {
+    int retcode = EXIT_SUCCESS;
+
     if (!opt_parse(argc, argv)) {
         fprintf(stderr, "Argument error. Exiting.\n");
         return EXIT_FAILURE;
@@ -127,7 +129,6 @@ int main(int argc, char *argv[])
     if (options.wordlist) {
         fprintf(stderr, "Dict=%s\n", options.wordlist);
     }
-    return EXIT_SUCCESS;
 
     int nprocs = sysconf(_SC_NPROCESSORS_ONLN);
     pid_t pids[nprocs];
@@ -141,7 +142,8 @@ int main(int argc, char *argv[])
         gen_ctx_create(WEP_ALPHABET, WEP_ALPHABET_LEN, WEP_KEY_LEN, qid);
     if (!crack_ctx) {
         fprintf(stderr, "Can't create context. Exiting.\n");
-        return EXIT_FAILURE;
+        retcode = EXIT_FAILURE;
+        goto cleanup;
     }
     gen_apply_fn pw_apply = wep_check_key_with_data;
 
@@ -149,7 +151,8 @@ int main(int argc, char *argv[])
         pids[i] = fork();
         if (pids[i] == -1) {
             perror("fork");
-            return EXIT_FAILURE;
+            retcode = EXIT_FAILURE;
+            goto cleanup;
         }
 
         if (pids[i] == 0) {
@@ -197,16 +200,18 @@ int main(int argc, char *argv[])
             }
             if (errno != EINTR) {
                 perror("waitpid");
-                return EXIT_FAILURE;
+                retcode = EXIT_FAILURE;
+                goto cleanup;
             }
         }
     }
 
     fprintf(stderr,"Main done!\n");
 
+  cleanup:
     msg_destroy(crack_ctx->msgqid);
     gen_ctx_destroy(crack_ctx);
     opt_clean();
 
-    return EXIT_SUCCESS;
+    return retcode;
 }

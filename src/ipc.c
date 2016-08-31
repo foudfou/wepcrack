@@ -46,6 +46,7 @@ bool msg_put(const int qid, const struct msg_buf *msg)
     return true;
 }
 
+/* Returns -2 when NOMSG, -1 when ERROR, size of copied text otherwise. */
 static ssize_t
 msg_get_generic(const int qid, struct msg_buf *msg, const long msgtype,
                 const bool async)
@@ -54,8 +55,12 @@ msg_get_generic(const int qid, struct msg_buf *msg, const long msgtype,
     if (async)
         msgflg |= IPC_NOWAIT;
     ssize_t size = msgrcv(qid, (void *)msg, sizeof(msg->text), msgtype, msgflg);
-    if (size == -1 && errno != ENOMSG)
-        perror("msgrcv");
+    if (size == -1) {
+        if (errno == ENOMSG)
+            size = -2;
+        else
+            perror("msgrcv");
+    }
     return size;
 }
 
