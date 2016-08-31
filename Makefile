@@ -15,9 +15,9 @@ ifeq (, $(has_clang))
 	CC = gcc
 endif
 DEFS = -D _XOPEN_SOURCE=700
-CFLAGS = $(DEFS) -std=c11 -Wall -Wextra -I$(SRCDIR) -fopenmp \
+CFLAGS = $(DEFS) -std=c11 -Wall -Wextra -I$(SRCDIR) \
   `pkg-config --cflags openssl`
-LDFLAGS = -lm -fopenmp `pkg-config --libs openssl`
+LDFLAGS = -lm `pkg-config --libs openssl`
 
 BUILD_ENV ?= dev
 ifeq ($(BUILD_ENV),release)
