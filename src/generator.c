@@ -48,7 +48,7 @@ void gen_apply(struct gen_ctx *ctx, gen_apply_fn fun)
     unsigned char pw[ctx->pw_len];
     memset(pw, 0, ctx->pw_len);
 
-    unsigned long long i, j;
+    unsigned long long i;
     unsigned long long thrl = 0;
     alarm(THRL_DELAY);
     for (i = ctx->state.from; i < ctx->state.until; ++i) {
@@ -59,10 +59,10 @@ void gen_apply(struct gen_ctx *ctx, gen_apply_fn fun)
         }
         if (BIT_CHK(events, EV_SIGINT)) {
             BIT_CLR(events, EV_SIGINT);
-            fprintf(stderr, "(%d) saving state.\n", ctx->state.task_id);
             struct msg_buf state_msg;
             state_msg.type = MSG_TYPE_TASK_STATE;
-            snprintf(state_msg.text, MSG_TEXT_LEN, "hi%d", ctx->state.task_id);
+            snprintf(state_msg.text, MSG_TEXT_LEN, "%d:%llu:%llu:%llu",
+                     ctx->state.task_id, ctx->state.from, ctx->state.until, i);
             if (!msg_put(ctx->msgqid, &state_msg))
                 /* FIXME: dump ctx->state to screen */
                 fprintf(stderr, "ERROR: could not send state to parent\n");
@@ -76,6 +76,7 @@ void gen_apply(struct gen_ctx *ctx, gen_apply_fn fun)
         }
 
         unsigned long long n = i;
+        unsigned long long j;
         for (j = 0; j < ctx->pw_len; ++j){
             pw[ctx->pw_len -j -1] = ctx->alpha[n % ctx->alpha_len];
             n /= ctx->alpha_len;

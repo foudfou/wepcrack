@@ -6,6 +6,7 @@
 struct opt_def {
     bool restore;
     char *wordlist;
+    char *statefile;
 };
 
 extern struct opt_def options;

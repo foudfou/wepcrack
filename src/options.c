@@ -8,14 +8,16 @@
 struct opt_def options = {
     .restore = false,
     .wordlist = 0,
+    .statefile = "/tmp/wepcrack.dmp",
 };
 
 static struct option opt_long[] = {
-    {"restore",  no_argument,       0, 'r'},
-    {"wordlist", required_argument, 0, 'w'},
+    {"restore",   no_argument,       0, 'r'},
+    {"wordlist",  required_argument, 0, 'w'},
+    {"statefile", required_argument, 0, 's'},
     { 0 },
 };
-static char *opt_str = "hrw:";
+static char *opt_str = "hrw:s:";
 
 static void usage()
 {
@@ -23,6 +25,7 @@ static void usage()
   printf("  -h, --help\n");
   printf("  -r, --restore\n");
   printf("  -w, --wordlist DICTFILE\n");
+  printf("  -s, --statefile STATEFILE for storing dumped state\n");
 }
 
 static bool opt_check(void)
@@ -33,6 +36,16 @@ static bool opt_check(void)
     }
 
     return true;
+}
+
+char * opt_stralloc(const char *optarg)
+{
+    char *str = malloc(strlen(optarg) + 1);
+    if (str)
+        strcpy(str, optarg);
+    else
+        perror("malloc");
+    return str;
 }
 
 bool opt_parse(const int argc, char * const *argv)
@@ -57,12 +70,14 @@ bool opt_parse(const int argc, char * const *argv)
             options.restore = true;
             break;
         case 'w':
-            options.wordlist = (char *)malloc(strlen(optarg) + 1);
-            if (!options.wordlist) {
-                perror("malloc");
+            options.wordlist = opt_stralloc(optarg);
+            if (!options.wordlist)
                 return false;
-            }
-            strcpy(options.wordlist, optarg);
+            break;
+        case 's':
+            options.statefile = opt_stralloc(optarg);
+            if (!options.statefile)
+                return false;
             break;
         }
     } while (cont);

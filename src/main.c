@@ -17,6 +17,8 @@
 #include "wep.h"
 #include "wep_data.h"
 
+#define MAXLINE 256
+
 
 void sig_handler(int signo)
 {
@@ -90,16 +92,35 @@ int msg_install(const char *path)
 
 int state_save(const int qid, const int nprocs)
 {
+    int ret = 0;
+
+    FILE * statefile = fopen(options.statefile, "w");
+    if (!statefile) {
+        perror("fopen");
+        return ret;
+    }
+
     int msg_count = 0;
     // TODO: add timeout
     struct msg_buf msg;
     while (msg_count < nprocs) {
         if (msg_get_sync(qid, &msg, 0) > 0) {
             msg_count += 1;
-            fprintf(stderr, "main got msg: %s\n", msg.text);
+            if (fputs(msg.text, statefile) == EOF) {
+                fprintf(stderr, "fputs failed.\n");
+                goto cleanup;
+            }
+            if (fputc('\n', statefile) == EOF) {
+                fprintf(stderr, "fputc failed.\n");
+                goto cleanup;
+            }
         }
     }
-    return 0;
+    ret = msg_count;
+
+  cleanup:
+    fclose(statefile);
+    return ret;
 }
 
 static void wep_check_key_with_data(const unsigned char *key, unsigned len)
@@ -135,7 +156,8 @@ int main(int argc, char *argv[])
 
     /* We install the handler before forking, so the children inherit it. */
     sig_install();
-    /* The msg queue will be used to pass children's state to the parent. */
+    /* The msg queue will be used to pass children's state to the parent, or
+     * passwords to children. */
     int qid = msg_install(argv[0]);
 
     struct gen_ctx *crack_ctx =
@@ -185,7 +207,13 @@ int main(int argc, char *argv[])
             sigint += 1;
             if (sigint > 1) {
                 sig_children(pids, nprocs, SIGINT);
-                state_save(qid, nprocs);
+                int ret = state_save(qid, nprocs);
+                if (ret != nprocs) {
+                    fprintf(stderr, "ERROR: Could not complete saving state.\n");
+                    retcode = EXIT_FAILURE;
+                    goto cleanup;
+                }
+                fprintf(stderr, "\nState saved to %s.\n", options.statefile);
                 break;
             }
             fprintf(stderr, " Termination request."
@@ -206,12 +234,46 @@ int main(int argc, char *argv[])
         }
     }
 
-    fprintf(stderr,"Main done!\n");
+    fprintf(stderr,"Bye.\n");
 
   cleanup:
-    msg_destroy(crack_ctx->msgqid);
     gen_ctx_destroy(crack_ctx);
+    msg_destroy(qid);
     opt_clean();
 
     return retcode;
 }
+
+/* This will be used for wordlist/passworddict parsing
+    if (options.wordlist) {
+        FILE * dictfile = fopen(options.wordlist, "r");
+        if (!dictfile) {
+            perror("fopen");
+            retcode = EXIT_FAILURE;
+            goto cleanup;
+        }
+
+        off_t offset = -1;
+        unsigned long long line = 0;
+        char buf[MAXLINE];
+        char pw[MAXLINE-1];
+        while (fgets(buf, MAXLINE, dictfile)) {
+            line += 1;
+            const char *c = strchr(buf, '\n');
+            if (c) {
+                ptrdiff_t idx = c - buf;
+                offset += idx + 1;
+                printf("%lu, %lu: %s", idx, offset, buf);
+            }
+            else {
+                fprintf(stderr, "WARNING: no \\n found line %llu.\n", line);
+            }
+        }
+
+        if (ferror(dictfile))
+            perror("input error");
+
+        fclose(dictfile);
+        goto cleanup;
+    }
+*/
