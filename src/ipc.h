@@ -6,7 +6,9 @@
 
 #define MSG_PROJ_ID 'A'
 #define MSG_TEXT_LEN 80
-#define MSG_TYPE_TASK_STATE 0x0
+// man msgsnd(2): « mtype must have a strictly positive integer value »
+#define MSG_TYPE_TASK_STATE 0x1
+#define MSG_TYPE_WORD_READY 0x2
 
 struct msg_buf {
     long type;                  // serves as address
