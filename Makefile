@@ -9,11 +9,16 @@ TARGET = $(BINDIR)/wepcrack
 SRC    = $(wildcard $(SRCDIR)/*.c)
 INC    = $(wildcard $(SRCDIR)/*.h)
 OBJ    = $(SRC:.c=.o)
-CC     = clang
-has_clang = $(shell clang --version 2> /dev/null)
-ifeq (, $(has_clang))
-	CC = gcc
+
+ifneq "$(origin CC)" "environment"
+  has_clang = $(shell clang --version 2> /dev/null)
+  ifneq ($(has_clang), undefined)
+    CC = clang
+  else
+    CC = gcc
+  endif
 endif
+
 DEFS = -D _XOPEN_SOURCE=700
 CFLAGS = $(DEFS) -std=c11 -Wall -Wextra -I$(SRCDIR) \
   `pkg-config --cflags openssl`
