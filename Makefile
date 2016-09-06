@@ -25,8 +25,7 @@ CFLAGS = $(DEFS) -std=c11 -Wall -Wextra -I$(SRCDIR) \
 LDFLAGS = -lm `pkg-config --libs openssl`
 
 BUILD_ENV ?= dev
-ifeq ($(BUILD_ENV),release)
-else
+ifneq ($(BUILD_ENV),release)
   CFLAGS += -g -pedantic
 endif
 
