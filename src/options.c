@@ -48,7 +48,11 @@ char * opt_stralloc(const char *optarg)
     return str;
 }
 
-bool opt_parse(const int argc, char * const *argv)
+/* Returns
+ * - 0 on success and the caller needs to continue execution
+ * - -1 on success and the caller needs to halt further execution
+ * - 1 on error  */
+int opt_parse(const int argc, char * const *argv)
 {
     extern char *optarg;
     extern int optind, opterr, optopt;
@@ -59,12 +63,13 @@ bool opt_parse(const int argc, char * const *argv)
         switch (ret) {
         case '?':
             usage();
-            return false;
+            return 1;
         case -1:
             cont = 0;
             break;
         case 'h':
             usage();
+            return -1;
             break;
         case 'r':
             options.restore = true;
@@ -72,12 +77,12 @@ bool opt_parse(const int argc, char * const *argv)
         case 'w':
             options.wordlist = opt_stralloc(optarg);
             if (!options.wordlist)
-                return false;
+                return 1;
             break;
         case 's':
             options.statefile = opt_stralloc(optarg);
             if (!options.statefile)
-                return false;
+                return 1;
             break;
         }
     } while (cont);
@@ -88,9 +93,9 @@ bool opt_parse(const int argc, char * const *argv)
     }
 
     if (!opt_check())
-        return false;
+        return 1;
 
-    return true;
+    return 0;
 }
 
 void opt_clean(void)
