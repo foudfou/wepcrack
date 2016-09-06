@@ -61,7 +61,7 @@ valgrind:
   --log-file=/tmp/valgrind-%p.log" \
   $(MAKE)
 
-.PHONY: clean distclean
+.PHONY: clean distclean TAGS
 
 clean:
 	@rm -rf $(OBJ) $(TESTS)
@@ -74,6 +74,8 @@ distclean: clean
 	@rm -rf $(TARGET)
 	@printf "\e[34mAll clear!\e[0m\n"&
 
+TAGS: $(SRC) $(TEST_SRC)
+	etags $(SRC) $(TEST_SRC)
 
 # Show variables (for debug use only.)
 show:
