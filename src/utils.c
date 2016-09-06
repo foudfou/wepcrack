@@ -1,5 +1,7 @@
+#include <errno.h>
 #include <limits.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include "utils.h"
@@ -33,8 +35,35 @@ void print_hex(const unsigned char *bytes, unsigned len)
     printf("%s\n", dst);
 }
 
-bool is_little_endian()
+union int_t intfromstr(const char *str, const int itype, bool *err)
 {
-    uint32_t endianness = 0x00ff00ff;
-    return (((unsigned char *)&endianness)[0] == 0xff);
+    char *endptr = NULL;
+    errno = 0;
+    union int_t val = { 0 };
+    switch (itype) {
+    case STRTOINT_ULL:
+        val.ull = strtoull(str, &endptr, 10);
+        break;
+    case STRTOINT_L:
+        val.l = strtol(str, &endptr, 10);
+        break;
+    default:
+        fprintf(stderr, "Unsupported type %d\n", itype);
+        *err = true;
+        goto end;
+    }
+    if (errno) {
+        perror("strtoull");
+        *err = true;
+        goto end;
+    }
+
+    if (endptr == str) {
+        *err = true;
+        goto end;
+    }
+
+    *err = false;
+  end:
+    return val;
 }

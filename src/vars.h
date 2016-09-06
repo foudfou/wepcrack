@@ -8,6 +8,9 @@
 #define EV_SIGUSR1  8
 #define EV_SIGALRM  9
 
+#define MAX_LINE  256
+#define MAX_PROCS 256
+
 extern volatile unsigned long events;
 
 #endif /* VARS_H */

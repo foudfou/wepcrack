@@ -17,8 +17,7 @@
 #include "wep.h"
 #include "wep_data.h"
 
-#define MAXLINE 256
-
+// FIXME: all `const` declarations need to be checked: int const * const
 
 void sig_handler(int signo)
 {
@@ -80,47 +79,7 @@ int msg_install(const char *path)
        struct msg_buf _;
        while (msg_get(qid, &_, 0) > 0);
    }
-   else {
-       qid = msg_create(path);
-       if (qid == -1) {
-           fprintf(stderr, "Could not create message queue. Exiting...\n");
-           return EXIT_FAILURE;
-       }
-   }
-   return qid;
-}
-
-int state_save(const int qid, const int nprocs)
-{
-    int ret = 0;
-
-    FILE * statefile = fopen(options.statefile, "w");
-    if (!statefile) {
-        perror("fopen");
-        return ret;
-    }
-
-    int msg_count = 0;
-    // TODO: add timeout
-    struct msg_buf msg;
-    while (msg_count < nprocs) {
-        if (msg_get_sync(qid, &msg, 0) > 0) {
-            msg_count += 1;
-            if (fputs(msg.text, statefile) == EOF) {
-                fprintf(stderr, "fputs failed.\n");
-                goto cleanup;
-            }
-            if (fputc('\n', statefile) == EOF) {
-                fprintf(stderr, "fputc failed.\n");
-                goto cleanup;
-            }
-        }
-    }
-    ret = msg_count;
-
-  cleanup:
-    fclose(statefile);
-    return ret;
+   return msg_create(path);
 }
 
 static void wep_check_key_with_data(const unsigned char *key, unsigned len)
@@ -132,20 +91,59 @@ static void wep_check_key_with_data(const unsigned char *key, unsigned len)
     }
 }
 
+bool gen_fork(pid_t *pids, struct gen_ctx *ctx, const gen_apply_fn pw_apply,
+              const int nprocs, const int ntasks,
+              struct gen_task_state * const states[MAX_PROCS])
+{
+    int loops = ntasks ? ntasks : nprocs;
+    for (int i = 0; i < loops; i++) {
+        pids[i] = fork();
+        if (pids[i] == -1) {
+            perror("fork");
+            return false;
+        }
 
-/* TODO:
-  + add session save/restore
- */
+        if (pids[i] == 0) {
+            // we don't want terminal SIGINT (^C) to be sent to children
+            if (setpgid(0, 0) == -1) {
+                perror("setpgid");
+                return false;
+            }
+
+            if (ntasks) {
+                ctx->state.task_id = states[i]->task_id;
+                ctx->state.from = states[i]->from;
+                ctx->state.until = states[i]->until;
+                ctx->state.cur = states[i]->cur;
+            }
+            else {
+                ctx->state.task_id = i;
+                ctx->state.from = ctx->total_n*i/nprocs;
+                ctx->state.until = ctx->total_n*(i + 1)/nprocs;
+                ctx->state.cur = ctx->state.from;
+            }
+
+            fprintf(stderr, "%u: %llu -> %llu (%llu)\n", ctx->state.task_id,
+                    ctx->state.from, ctx->state.until, ctx->state.cur);
+            gen_apply(ctx, pw_apply);
+            exit(EXIT_SUCCESS);
+        }
+    }
+    return true;
+}
+
+
 int main(int argc, char *argv[])
 {
     int retcode = EXIT_SUCCESS;
 
-    if (!opt_parse(argc, argv)) {
+    int ret = opt_parse(argc, argv);
+    if (ret > 0) {
         fprintf(stderr, "Argument error. Exiting.\n");
         return EXIT_FAILURE;
     }
-    if (options.restore) {
-        fprintf(stderr, "Restoring...\n");
+    else if (ret < 0) {
+        return EXIT_SUCCESS;
     }
     if (options.wordlist) {
         fprintf(stderr, "Dict=%s\n", options.wordlist);
@@ -155,10 +153,21 @@ int main(int argc, char *argv[])
     pid_t pids[nprocs];
 
     /* We install the handler before forking, so the children inherit it. */
-    sig_install();
+    if (!sig_install()) {
+        fprintf(stderr, "Could not install signals. Exiting...\n");
+        return EXIT_FAILURE;
+    }
+
     /* The msg queue will be used to pass children's state to the parent, or
      * passwords to children. */
     int qid = msg_install(argv[0]);
+    if (qid == -1) {
+        fprintf(stderr, "Could not create message queue. Exiting...\n");
+        return EXIT_FAILURE;
+    }
+
+    int ntasks = 0;             // FIXME: should be a member of gen_ctx
+    struct gen_task_state *task_states[MAX_PROCS] = { 0 };
 
     struct gen_ctx *crack_ctx =
         gen_ctx_create(WEP_ALPHABET, WEP_ALPHABET_LEN, WEP_KEY_LEN, qid);
@@ -169,29 +178,23 @@ int main(int argc, char *argv[])
     }
     gen_apply_fn pw_apply = wep_check_key_with_data;
 
-    for (int i = 0; i < nprocs; i++) {
-        pids[i] = fork();
-        if (pids[i] == -1) {
-            perror("fork");
+    if (options.restore) {
+        fprintf(stderr, "Restoring from %s.\n", options.statefile);
+        ntasks = gen_state_read(task_states);
+        if (ntasks > nprocs) {
+            fprintf(stderr, "More tasks than available cpus.\n");
             retcode = EXIT_FAILURE;
             goto cleanup;
         }
+    }
+    else {
+        fprintf(stderr, "Generating all possibilities.\n");
+    }
 
-        if (pids[i] == 0) {
-            // we don't want terminal SIGINT (^C) to be sent to children
-            if (setpgid(0, 0) == -1) {
-                perror("setpgid");
-                return EXIT_FAILURE;
-            }
-            crack_ctx->state.task_id = i;
-            crack_ctx->state.from = crack_ctx->total_n*i/nprocs;
-            crack_ctx->state.until = crack_ctx->total_n*(i + 1)/nprocs;
-            crack_ctx->state.cur = crack_ctx->state.from;
-            fprintf(stderr, "%u: %lli -> %lli\n", i, crack_ctx->state.from,
-                    crack_ctx->state.until);
-            gen_apply(crack_ctx, pw_apply);
-            return EXIT_SUCCESS;
-        }
+    if (!gen_fork(pids, crack_ctx, pw_apply, nprocs, ntasks, task_states)) {
+        fprintf(stderr, "fork failed\n");
+        retcode = EXIT_FAILURE;
+        goto cleanup;
     }
 
     pid_t wpid;
@@ -207,7 +210,7 @@ int main(int argc, char *argv[])
             sigint += 1;
             if (sigint > 1) {
                 sig_children(pids, nprocs, SIGINT);
-                int ret = state_save(qid, nprocs);
+                int ret = gen_state_save(qid, nprocs);
                 if (ret != nprocs) {
                     fprintf(stderr, "ERROR: Could not complete saving state.\n");
                     retcode = EXIT_FAILURE;
@@ -237,6 +240,7 @@ int main(int argc, char *argv[])
     fprintf(stderr,"Bye.\n");
 
   cleanup:
+    gen_state_destroy(ntasks, task_states);
     gen_ctx_destroy(crack_ctx);
     msg_destroy(qid);
     opt_clean();
@@ -255,9 +259,9 @@ int main(int argc, char *argv[])
 
         off_t offset = -1;
         unsigned long long line = 0;
-        char buf[MAXLINE];
-        char pw[MAXLINE-1];
-        while (fgets(buf, MAXLINE, dictfile)) {
+        char buf[MAX_LINE];
+        char pw[MAX_LINE-1];
+        while (fgets(buf, MAX_LINE, dictfile)) {
             line += 1;
             const char *c = strchr(buf, '\n');
             if (c) {

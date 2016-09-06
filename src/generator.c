@@ -6,6 +6,7 @@
 #include "generator.h"
 #include "bit.h"
 #include "ipc.h"
+#include "options.h"
 #include "utils.h"
 #include "vars.h"
 
@@ -43,39 +44,43 @@ void gen_ctx_destroy(struct gen_ctx *ctx)
     free(ctx);
 }
 
-void gen_apply(struct gen_ctx *ctx, gen_apply_fn fun)
+void gen_apply(struct gen_ctx *ctx, const gen_apply_fn fun)
 {
     unsigned char pw[ctx->pw_len];
     memset(pw, 0, ctx->pw_len);
 
-    unsigned long long i;
+    unsigned long long state_last = ctx->state.cur;
     unsigned long long thrl = 0;
     alarm(THRL_DELAY);
-    for (i = ctx->state.from; i < ctx->state.until; ++i) {
+    while (ctx->state.cur < ctx->state.until) {
         if (BIT_CHK(events, EV_SIGUSR1)) {
             BIT_CLR(events, EV_SIGUSR1);
             fprintf(stderr, "(%d) currently at %llu (%llu keys/s).\n",
-                    ctx->state.task_id, i, thrl);
+                    ctx->state.task_id, ctx->state.cur, thrl);
         }
         if (BIT_CHK(events, EV_SIGINT)) {
             BIT_CLR(events, EV_SIGINT);
             struct msg_buf state_msg;
             state_msg.type = MSG_TYPE_TASK_STATE;
-            snprintf(state_msg.text, MSG_TEXT_LEN, "%d:%llu:%llu:%llu",
-                     ctx->state.task_id, ctx->state.from, ctx->state.until, i);
-            if (!msg_put(ctx->msgqid, &state_msg))
-                /* FIXME: dump ctx->state to screen */
-                fprintf(stderr, "ERROR: could not send state to parent\n");
+            // serialize
+            snprintf(state_msg.text, MSG_TEXT_LEN, "%d"GEN_STATE_SEP
+                     "%llu"GEN_STATE_SEP"%llu"GEN_STATE_SEP"%llu",
+                     ctx->state.task_id, ctx->state.from, ctx->state.until,
+                     ctx->state.cur);
+            if (!msg_put(ctx->msgqid, &state_msg)) {
+                fprintf(stderr, "ERROR: could not send state to parent: %s\n",
+                        state_msg.text);
+            }
             return;
         }
         if (BIT_CHK(events, EV_SIGALRM)) {
             BIT_CLR(events, EV_SIGALRM);
-            thrl = (i - ctx->state.cur) / THRL_DELAY;
-            ctx->state.cur = i;
+            thrl = (ctx->state.cur - state_last) / THRL_DELAY;
+            state_last = ctx->state.cur;
             alarm(THRL_DELAY);
         }
 
-        unsigned long long n = i;
+        unsigned long long n = ctx->state.cur;
         unsigned long long j;
         for (j = 0; j < ctx->pw_len; ++j){
             pw[ctx->pw_len -j -1] = ctx->alpha[n % ctx->alpha_len];
@@ -83,5 +88,112 @@ void gen_apply(struct gen_ctx *ctx, gen_apply_fn fun)
         }
 
         (*fun)(pw, ctx->pw_len);
+
+        ctx->state.cur += 1;
     }
+}
+
+int gen_state_save(const int qid, const int nprocs)
+{
+    int ret = 0;
+
+    FILE * statefile = fopen(options.statefile, "w");
+    if (!statefile) {
+        perror("fopen");
+        return ret;
+    }
+
+    int msg_count = 0;
+    // TODO: add timeout
+    struct msg_buf msg;
+    while (msg_count < nprocs) {
+        if (msg_get_sync(qid, &msg, 0) > 0) {
+            msg_count += 1;
+            if (fputs(msg.text, statefile) == EOF) {
+                fprintf(stderr, "fputs failed.\n");
+                goto cleanup;
+            }
+            if (fputc('\n', statefile) == EOF) {
+                fprintf(stderr, "fputc failed.\n");
+                goto cleanup;
+            }
+        }
+    }
+    ret = msg_count;
+
+  cleanup:
+    fclose(statefile);
+    return ret;
+}
+
+/* Return length of states read, or -1 on error.
+ * The allocated `struct gen_task_state` array MUST be free'd with
+ * gen_state_destroy().
+ */
+int gen_state_read(struct gen_task_state *states[MAX_PROCS])
+{
+    int len = 0;
+
+    FILE * statefile = fopen(options.statefile, "r");
+    if (!statefile) {
+        perror("fopen");
+        return len;
+    }
+
+    unsigned int line = 0;
+    char buf[MAX_LINE];
+    while (fgets(buf, MAX_LINE, statefile)) {
+        line = len + 1;
+
+        // deserialize
+        char * taskstr = strtok(buf, GEN_STATE_SEP);
+        if (!taskstr) {
+            len = -1;
+            goto cleanup;
+        }
+        bool err;
+
+        struct gen_task_state *state = malloc(sizeof(struct gen_task_state));
+        union int_t task = intfromstr(taskstr, STRTOINT_L, &err);
+        state->task_id = task.l;
+        if (err) {
+            fprintf(stderr, "ERROR: parsing error on line %d\n", line);
+            len = -1;
+            goto cleanup;
+        }
+
+        unsigned long long *statem[3] = {
+            &state->from, &state->until, &state->cur };
+        for (int i = 0; i < 3; ++i) {
+            char *str = strtok(NULL, GEN_STATE_SEP);
+            *statem[i] = (intfromstr(str, STRTOINT_ULL, &err)).ull;
+            if (err) {
+                fprintf(stderr, "ERROR: parsing error on line %d\n", line);
+                len = -1;
+                goto cleanup;
+            }
+        }
+
+        if (strtok(NULL, GEN_STATE_SEP)) {
+            fprintf(stderr, "ERROR: remaining data on line %d\n", line);
+            len = -1;
+            goto cleanup;
+        }
+
+        len += 1;
+        states[len-1] = state;
+    }
+
+    if (ferror(statefile))
+        perror("input error");
+
+  cleanup:
+    fclose(statefile);
+    return len;
+}
+
+void gen_state_destroy(int states_len, struct gen_task_state *states[MAX_PROCS])
+{
+    for (int i = 0; i < states_len; ++i)
+        free(states[i]);
 }

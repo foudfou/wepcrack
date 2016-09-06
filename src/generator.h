@@ -5,6 +5,10 @@
 #ifndef GENERATOR_H
 #define GENERATOR_H
 
+#include "vars.h"
+
+#define GEN_STATE_SEP ":"
+
 typedef void (* gen_apply_fn)(const unsigned char *, unsigned);
 
 struct gen_task_state
@@ -30,6 +34,10 @@ struct gen_ctx *gen_ctx_create(const char *a, const unsigned a_len,
 
 void gen_ctx_destroy(struct gen_ctx *ctx);
 
-void gen_apply(struct gen_ctx *ctx, gen_apply_fn fun);
+void gen_apply(struct gen_ctx *ctx, const gen_apply_fn fun);
+
+int gen_state_save(const int qid, const int nprocs);
+int gen_state_read(struct gen_task_state *states[MAX_PROCS]);
+void gen_state_destroy(int states_len, struct gen_task_state *states[MAX_PROCS]);
 
 #endif /* GENERATOR_H */
