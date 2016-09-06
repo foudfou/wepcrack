@@ -26,6 +26,7 @@ struct gen_ctx
     unsigned              alpha_len;
     unsigned long long    total_n;
     int                   msgqid;
+    int                   nprocs;
     struct gen_task_state state;
 };
 

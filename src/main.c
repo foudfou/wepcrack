@@ -92,11 +92,10 @@ static void wep_check_key_with_data(const unsigned char *key, unsigned len)
 }
 
 bool gen_fork(pid_t *pids, struct gen_ctx *ctx, const gen_apply_fn pw_apply,
-              const int nprocs, const int ntasks,
+              const int states_len,
               struct gen_task_state * const states[MAX_PROCS])
 {
-    int loops = ntasks ? ntasks : nprocs;
-    for (int i = 0; i < loops; i++) {
+    for (int i = 0; i < ctx->nprocs; i++) {
         pids[i] = fork();
         if (pids[i] == -1) {
             perror("fork");
@@ -110,7 +109,7 @@ bool gen_fork(pid_t *pids, struct gen_ctx *ctx, const gen_apply_fn pw_apply,
                 return false;
             }
 
-            if (ntasks) {
+            if (states_len) {
                 ctx->state.task_id = states[i]->task_id;
                 ctx->state.from = states[i]->from;
                 ctx->state.until = states[i]->until;
@@ -118,8 +117,8 @@ bool gen_fork(pid_t *pids, struct gen_ctx *ctx, const gen_apply_fn pw_apply,
             }
             else {
                 ctx->state.task_id = i;
-                ctx->state.from = ctx->total_n*i/nprocs;
-                ctx->state.until = ctx->total_n*(i + 1)/nprocs;
+                ctx->state.from = ctx->total_n*i/ctx->nprocs;
+                ctx->state.until = ctx->total_n*(i + 1)/ctx->nprocs;
                 ctx->state.cur = ctx->state.from;
             }
 
@@ -166,35 +165,44 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    int ntasks = 0;             // FIXME: should be a member of gen_ctx
-    struct gen_task_state *task_states[MAX_PROCS] = { 0 };
-
     struct gen_ctx *crack_ctx =
         gen_ctx_create(WEP_ALPHABET, WEP_ALPHABET_LEN, WEP_KEY_LEN, qid);
     if (!crack_ctx) {
         fprintf(stderr, "Can't create context. Exiting.\n");
         retcode = EXIT_FAILURE;
-        goto cleanup;
+        goto cleanup_l0;
     }
     gen_apply_fn pw_apply = wep_check_key_with_data;
 
+    int task_states_len = 0;
+    struct gen_task_state *task_states[MAX_PROCS] = { 0 };
     if (options.restore) {
         fprintf(stderr, "Restoring from %s.\n", options.statefile);
-        ntasks = gen_state_read(task_states);
-        if (ntasks > nprocs) {
-            fprintf(stderr, "More tasks than available cpus.\n");
+        crack_ctx->nprocs = task_states_len = gen_state_read(task_states);
+        if (!crack_ctx->nprocs) {
+            fprintf(stderr, "No task states found. Exiting.\n");
             retcode = EXIT_FAILURE;
-            goto cleanup;
+            goto cleanup_l1;
+        }
+        if (crack_ctx->nprocs > nprocs) {
+            fprintf(stderr, "More tasks than available cpus. Exiting.\n");
+            retcode = EXIT_FAILURE;
+            goto cleanup_l1;
+        }
+        if (task_states_len < nprocs) {
+            fprintf(stderr, "WARNING: Less tasks found than available cpus."
+                    " No extra redistribution will be applied.\n");
         }
     }
     else {
         fprintf(stderr, "Generating all possibilities.\n");
+        crack_ctx->nprocs = nprocs;
     }
 
-    if (!gen_fork(pids, crack_ctx, pw_apply, nprocs, ntasks, task_states)) {
+    if (!gen_fork(pids, crack_ctx, pw_apply, task_states_len, task_states)) {
         fprintf(stderr, "fork failed\n");
         retcode = EXIT_FAILURE;
-        goto cleanup;
+        goto cleanup_l1;
     }
 
     pid_t wpid;
@@ -203,18 +211,18 @@ int main(int argc, char *argv[])
     for (;;) {
         if (BIT_CHK(events, EV_SIGUSR1)) {
             BIT_CLR(events, EV_SIGUSR1);
-            sig_children(pids, nprocs, SIGUSR1);
+            sig_children(pids, crack_ctx->nprocs, SIGUSR1);
         }
         if (BIT_CHK(events, EV_SIGINT)) {
             BIT_CLR(events, EV_SIGINT);
             sigint += 1;
             if (sigint > 1) {
-                sig_children(pids, nprocs, SIGINT);
-                int ret = gen_state_save(qid, nprocs);
-                if (ret != nprocs) {
+                sig_children(pids, crack_ctx->nprocs, SIGINT);
+                int ret = gen_state_save(qid, crack_ctx->nprocs);
+                if (ret != crack_ctx->nprocs) {
                     fprintf(stderr, "ERROR: Could not complete saving state.\n");
                     retcode = EXIT_FAILURE;
-                    goto cleanup;
+                    goto cleanup_l1;
                 }
                 fprintf(stderr, "\nState saved to %s.\n", options.statefile);
                 break;
@@ -232,15 +240,16 @@ int main(int argc, char *argv[])
             if (errno != EINTR) {
                 perror("waitpid");
                 retcode = EXIT_FAILURE;
-                goto cleanup;
+                goto cleanup_l1;
             }
         }
     }
 
     fprintf(stderr,"Bye.\n");
 
-  cleanup:
-    gen_state_destroy(ntasks, task_states);
+  cleanup_l1:
+    gen_state_destroy(task_states_len, task_states);
+  cleanup_l0:
     gen_ctx_destroy(crack_ctx);
     msg_destroy(qid);
     opt_clean();

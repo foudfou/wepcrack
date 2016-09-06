@@ -4,6 +4,13 @@
 #include <stdbool.h>
 #include <sys/msg.h>
 
+#define EV_SIGINT   0
+#define EV_SIGHUP   1
+#define EV_SIGQUIT  2
+#define EV_SIGTERM  3
+#define EV_SIGUSR1  8
+#define EV_SIGALRM  9
+
 #define MSG_PROJ_ID 'A'
 #define MSG_TEXT_LEN 80
 // man msgsnd(2): « mtype must have a strictly positive integer value »

@@ -35,6 +35,13 @@ struct gen_ctx *gen_ctx_create(const char *a, const unsigned a_len,
         return NULL;
     }
     ctx->msgqid = qid;
+
+    ctx->nprocs = 0;
+    ctx->state.task_id = 0;
+    ctx->state.from = 0;
+    ctx->state.until = 0;
+    ctx->state.cur = 0;
+
     return ctx;
 }
 
