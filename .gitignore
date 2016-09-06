@@ -4,6 +4,7 @@ tests/*_tests
 tests/*log
 .gdb_history
 peda-session-*
+TAGS
 
 # Prerequisites
 *.d
