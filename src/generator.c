@@ -1,15 +1,19 @@
+#include <errno.h>
 #include <limits.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/wait.h>
 #include <unistd.h>
-#include "generator.h"
 #include "bit.h"
 #include "ipc.h"
 #include "options.h"
 #include "utils.h"
-#include "vars.h"
+#include "wep.h"
+#include "generator.h"
 
+#define GEN_STATE_SEP ":"
 #define THRL_DELAY 5
 
 /* Returns a new context, or NULL if any of the following occurs: malloc
@@ -100,7 +104,7 @@ void gen_apply(struct gen_ctx *ctx, const gen_apply_fn fun)
     }
 }
 
-int gen_state_save(const int qid, const int nprocs)
+int gen_state_save(const struct gen_ctx *ctx)
 {
     int ret = 0;
 
@@ -113,8 +117,8 @@ int gen_state_save(const int qid, const int nprocs)
     int msg_count = 0;
     // TODO: add timeout
     struct msg_buf msg;
-    while (msg_count < nprocs) {
-        if (msg_get_sync(qid, &msg, 0) > 0) {
+    while (msg_count < ctx->nprocs) {
+        if (msg_get_sync(ctx->msgqid, &msg, 0) > 0) {
             msg_count += 1;
             if (fputs(msg.text, statefile) == EOF) {
                 fprintf(stderr, "fputs failed.\n");
@@ -203,4 +207,127 @@ void gen_state_destroy(int states_len, struct gen_task_state *states[MAX_PROCS])
 {
     for (int i = 0; i < states_len; ++i)
         free(states[i]);
+}
+
+static bool
+gen_fork(pid_t *pids, struct gen_ctx *ctx, const gen_apply_fn pw_apply,
+         const int states_len, struct gen_task_state * const states[MAX_PROCS])
+{
+    for (int i = 0; i < ctx->nprocs; i++) {
+        pids[i] = fork();
+        if (pids[i] == -1) {
+            perror("fork");
+            return false;
+        }
+
+        if (pids[i] == 0) {
+            // we don't want terminal SIGINT (^C) to be sent to children
+            if (setpgid(0, 0) == -1) {
+                perror("setpgid");
+                return false;
+            }
+
+            if (states_len) {
+                ctx->state.task_id = states[i]->task_id;
+                ctx->state.from = states[i]->from;
+                ctx->state.until = states[i]->until;
+                ctx->state.cur = states[i]->cur;
+            }
+            else {
+                ctx->state.task_id = i;
+                ctx->state.from = ctx->total_n*i/ctx->nprocs;
+                ctx->state.until = ctx->total_n*(i + 1)/ctx->nprocs;
+                ctx->state.cur = ctx->state.from;
+            }
+
+            fprintf(stderr, "%u: %llu -> %llu (%llu)\n", ctx->state.task_id,
+                    ctx->state.from, ctx->state.until, ctx->state.cur);
+            gen_apply(ctx, pw_apply);
+            exit(EXIT_SUCCESS);
+        }
+    }
+    return true;
+}
+
+bool gen_deploy(const int qid, const int nprocs, const gen_apply_fn pw_apply)
+{
+    struct gen_ctx *ctx =
+        gen_ctx_create(WEP_ALPHABET, WEP_ALPHABET_LEN, WEP_KEY_LEN, qid);
+    if (!ctx) {
+        fprintf(stderr, "Can't create context. Exiting.\n");
+        return false;
+    }
+
+    int task_states_len = 0;
+    struct gen_task_state *task_states[MAX_PROCS] = { 0 };
+    if (options.restore) {
+        fprintf(stderr, "Restoring from %s.\n", options.statefile);
+        ctx->nprocs = task_states_len = gen_state_read(task_states);
+        if (!ctx->nprocs) {
+            fprintf(stderr, "No task states found. Exiting.\n");
+            return false;
+        }
+        if (ctx->nprocs > nprocs) {
+            fprintf(stderr, "More tasks than available cpus. Exiting.\n");
+            gen_state_destroy(task_states_len, task_states);
+            return false;
+        }
+        if (task_states_len < nprocs) {
+            fprintf(stderr, "WARNING: Less tasks found than available cpus."
+                    " No extra redistribution will be applied.\n");
+        }
+    }
+    else {
+        fprintf(stderr, "Generating all possibilities.\n");
+        ctx->nprocs = nprocs;
+    }
+
+    pid_t pids[nprocs];
+    if (!gen_fork(pids, ctx, pw_apply, task_states_len, task_states)) {
+        fprintf(stderr, "fork failed\n");
+        gen_state_destroy(task_states_len, task_states);
+        return false;
+    }
+
+    pid_t wpid;
+    int wstatus;
+    int sigint = 0;
+    for (;;) {
+        if (BIT_CHK(events, EV_SIGUSR1)) {
+            BIT_CLR(events, EV_SIGUSR1);
+            sig_children(pids, ctx->nprocs, SIGUSR1);
+        }
+        if (BIT_CHK(events, EV_SIGINT)) {
+            BIT_CLR(events, EV_SIGINT);
+            sigint += 1;
+            if (sigint > 1) {
+                sig_children(pids, ctx->nprocs, SIGINT);
+                int ret = gen_state_save(ctx);
+                if (ret != ctx->nprocs) {
+                    fprintf(stderr, "ERROR: Could not complete saving state.\n");
+                    gen_state_destroy(task_states_len, task_states);
+                    return false;
+                }
+                fprintf(stderr, "\nState saved to %s.\n", options.statefile);
+                break;
+            }
+            fprintf(stderr, " Termination request."
+                    " Hit a second time to quit.\n");
+        }
+
+        wpid = waitpid(-1, &wstatus, WNOHANG);
+        if (wpid == -1) {
+            if (errno == ECHILD) {
+                fprintf(stderr, "All proceseses ended.\n");
+                break;
+            }
+            if (errno != EINTR) {
+                perror("waitpid");
+                gen_state_destroy(task_states_len, task_states);
+                return false;
+            }
+        }
+    }
+
+    return true;
 }

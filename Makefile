@@ -26,7 +26,7 @@ LDFLAGS = -lm `pkg-config --libs openssl`
 
 BUILD_ENV ?= dev
 ifneq ($(BUILD_ENV),release)
-  CFLAGS += -g -pedantic
+  CFLAGS += -g -pedantic -Wfatal-errors
 endif
 
 TEST_SRC = $(wildcard $(TESTDIR)/*_tests.c)
@@ -64,6 +64,7 @@ valgrind:
 
 clean:
 	@rm -rf $(OBJ) $(TESTS)
+	@rm -rf $(OBJDIR)/*.o  # spurious object files
 	@rm -f $(TESTDIR)/tests.log
 	@rm -f /tmp/valgrind-*
 	@rm -f $(TESTDIR)/*_tests

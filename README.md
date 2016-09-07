@@ -22,7 +22,7 @@ communicate their state upon termination to the main process through a message
 queue.
 
 For dictionary parsing, the passwords are feed to forked processes in a
-*Producer-Consumer* fashion, using semaphores.
+*Producer-Consumer* fashion, using semaphores and a message queue.
 
 ## Usage
 

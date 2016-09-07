@@ -1,8 +1,12 @@
 #include <errno.h>
+#include <signal.h>
 #include <stdio.h>
-#include <time.h>
-#include "ipc.h"
 #include <string.h>
+#include <time.h>
+#include "bit.h"
+#include "ipc.h"
+
+volatile unsigned long events = 0;
 
 static int msg_queue(const char *path, const int mode)
 {
@@ -72,4 +76,68 @@ ssize_t msg_get(const int qid, struct msg_buf *msg, const long msgtype)
 ssize_t msg_get_sync(const int qid, struct msg_buf *msg, const long msgtype)
 {
     return msg_get_generic(qid, msg, msgtype, false);
+}
+
+int msg_install(const char *path)
+{
+   int qid = msg_qid(path);
+   if (qid != -1) {
+       fprintf(stderr, "Found existing message queue. Cleaning...\n");
+       struct msg_buf _;
+       while (msg_get(qid, &_, 0) > 0);
+   }
+   return msg_create(path);
+}
+
+
+void sig_handler(int signo)
+{
+    switch (signo) {
+    case SIGALRM:
+        BIT_SET(events, EV_SIGALRM);
+        break;
+    case SIGUSR1:
+        BIT_SET(events, EV_SIGUSR1);
+        break;
+    case SIGTERM: /* ^\ */
+    case SIGQUIT: /* ^\ */
+    case SIGHUP:
+    case SIGINT:  /* ^C */
+        BIT_SET(events, EV_SIGINT);
+        break;
+    default:
+        fprintf(stderr, "caught unhandled %d\n", signo);
+    }
+}
+
+bool sig_install()
+{
+    int sig[][2] = {
+        {SIGALRM, SA_RESTART},
+        {SIGUSR1, SA_RESTART},
+        {SIGINT,  SA_RESTART},
+        {SIGHUP,  SA_RESTART},
+        {SIGQUIT, SA_RESTART},
+        {SIGTERM, SA_RESTART}
+    };
+    int len = sizeof(sig) / sizeof(int) / 2;
+
+    struct sigaction sa;
+    sa.sa_handler = sig_handler;
+    for (int i = 0; i < len; i++) {
+        sigemptyset(&sa.sa_mask);
+        sa.sa_flags = sig[i][1];
+        if (sigaction(sig[i][0], &sa, NULL) != 0) {
+            perror("sigaction");
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void sig_children(const pid_t *pids, const int nprocs, const int sig)
+{
+    for (int i = 0; i < nprocs; i++)
+        kill(pids[i], sig);
 }

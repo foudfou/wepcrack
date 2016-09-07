@@ -17,6 +17,8 @@
 #define MSG_TYPE_TASK_STATE 0x1
 #define MSG_TYPE_WORD_READY 0x2
 
+extern volatile unsigned long events;
+
 struct msg_buf {
     long type;                  // serves as address
     char text[MSG_TEXT_LEN];
@@ -29,5 +31,11 @@ bool msg_destroy(const int qid);
 bool msg_put(const int qid, const struct msg_buf *msg);
 ssize_t msg_get(const int qid, struct msg_buf *msg, const long msgtype);
 ssize_t msg_get_sync(const int qid, struct msg_buf *msg, const long msgtype);
+
+int msg_install(const char *path);
+
+void sig_handler(int signo);
+bool sig_install();
+void sig_children(const pid_t *pids, const int nprocs, const int sig);
 
 #endif /* IPC_H */
