@@ -56,11 +56,13 @@ int main(int argc, char *argv[])
     if (options.wordlist) {
         fprintf(stderr, "Parsing %s.\n", options.wordlist);
         // TODO: dict_fork();
-        dict_parse(qid);
+        if (!dict_parse(qid))
+            retcode = EXIT_FAILURE;
     }
     else {
         gen_apply_fn pw_apply = wep_check_key_with_data;
-        retcode = gen_deploy(qid, nprocs, pw_apply) ? EXIT_SUCCESS : EXIT_FAILURE;
+        if (!gen_deploy(qid, nprocs, pw_apply))
+            retcode = EXIT_FAILURE;
     }
 
     fprintf(stderr,"Bye.\n");
