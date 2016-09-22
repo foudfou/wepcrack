@@ -15,24 +15,37 @@
 #define SEM_NAME_EMPTY "/wepcrack.emp"
 #define SEM_NAME_FULL  "/wepcrack.ful"
 
-int check_events(const int nprocs, const pid_t *pids)
-{
-    static int sigint = 0;
-    if (BIT_CHK(events.sigs, EV_SIGUSR1)) {
-        BIT_CLR(events.sigs, EV_SIGUSR1);
-        sig_children(pids, nprocs, SIGUSR1);
-    }
-    if (BIT_CHK(events.sigs, EV_SIGINT)) {
-        BIT_CLR(events.sigs, EV_SIGINT);
-        sigint += 1;
-        if (sigint > 1) {
-            sig_children(pids, nprocs, SIGINT);
-            return EV_NEXT_FIN;
+typedef int (*callback)(void *);
+
+struct listener {
+    callback cb;
+    void     *data;
+};
+
+int check_events(struct listener onsig[3]) {
+    int evsig[3] = {EV_SIGUSR1, EV_SIGUSR2, EV_SIGINT};
+    for (int i = 0; i < 3; i++) {
+        if (BIT_CHK(events.sigs, evsig[i])) {
+            BIT_CLR(events.sigs, evsig[i]);
+            if (onsig[i].cb) {
+                if (onsig[i].cb(onsig[i].data) == EV_NEXT_FIN)
+                    return EV_NEXT_FIN;
+            }
         }
-        fprintf(stderr, " Termination request."
-                " Hit a second time to quit.\n");
     }
     return EV_NEXT_CONT;
+}
+
+
+static int usr2_consumer_cb(void *finish) {
+    if (events.sigpid == events.mainpid)
+        *(bool*)finish = true;
+    return EV_NEXT_CONT;
+}
+
+static int int_consumer_cb(void *data) {
+    (void)data;
+    return EV_NEXT_FIN;
 }
 
 static void
@@ -40,20 +53,16 @@ dict_consume(const struct dict_ctx *ctx, struct semphr sempair[2],
              const dict_apply_fn pw_apply)
 {
     bool finish = false;
+
+    struct listener onsignal[3] = {
+        {NULL, NULL},
+        {usr2_consumer_cb, (void*)&finish},
+        {int_consumer_cb, NULL},
+    };
+
     for (;;) {
-        // FIXME: make it a check_event()
-        if (BIT_CHK(events.sigs, EV_SIGUSR1)) {
-            BIT_CLR(events.sigs, EV_SIGUSR1);
-        }
-        if (BIT_CHK(events.sigs, EV_SIGUSR2)) {
-            BIT_CLR(events.sigs, EV_SIGUSR2);
-            if (events.sigpid == events.mainpid)
-                finish = true;
-        }
-        if (BIT_CHK(events.sigs, EV_SIGINT)) {
-            BIT_CLR(events.sigs, EV_SIGINT);
-            return;
-        }
+        if (check_events(onsignal) == EV_NEXT_FIN)
+            break;
 
         struct msg_buf msg;
         if (sem_trywait(sempair[1].semp) != 0) {
@@ -109,6 +118,30 @@ dict_fork(struct dict_ctx *ctx, pid_t *pids, struct semphr sempair[2],
     return true;
 }
 
+struct producer_cb_params {
+    int   nprocs;
+    pid_t *pids;
+};
+
+static int usr1_producer_cb(void *data) {
+    struct producer_cb_params *params = data;
+    sig_children(params->pids, params->nprocs, SIGUSR1);
+    return EV_NEXT_CONT;
+}
+
+static int int_producer_cb(void *data) {
+    struct producer_cb_params *params = data;
+    static int sigint = 0;
+    sigint += 1;
+    if (sigint > 1) {
+        sig_children(params->pids, params->nprocs, SIGINT);
+        return EV_NEXT_FIN;
+    }
+    fprintf(stderr, " Termination request."
+            " Hit a second time to quit.\n");
+    return EV_NEXT_CONT;
+}
+
 // producer
 bool dict_parse(struct dict_ctx *ctx, const dict_apply_fn pw_apply)
 {
@@ -127,6 +160,13 @@ bool dict_parse(struct dict_ctx *ctx, const dict_apply_fn pw_apply)
         return false;
     }
 
+    struct producer_cb_params params = {ctx->nprocs, pids};
+    struct listener onsignal[3] = {
+        {usr1_producer_cb, (void*)&params},
+        {NULL, NULL},
+        {int_producer_cb, (void*)&params},
+    };
+
     FILE * dictfile = fopen(options.wordlist, "r");
     if (!dictfile) {
         perror("fopen");
@@ -137,7 +177,7 @@ bool dict_parse(struct dict_ctx *ctx, const dict_apply_fn pw_apply)
     unsigned long long line = 0;
     char buf[MAX_LINE];
     while (fgets(buf, MAX_LINE, dictfile)) {
-        if (check_events(ctx->nprocs, pids) == EV_NEXT_FIN)
+        if (check_events(onsignal) == EV_NEXT_FIN)
             break;
 
         line += 1;
@@ -172,7 +212,7 @@ bool dict_parse(struct dict_ctx *ctx, const dict_apply_fn pw_apply)
 
     sig_children(pids, ctx->nprocs, SIGUSR2);
     for (;;) {
-        if (check_events(ctx->nprocs, pids) == EV_NEXT_FIN)
+        if (check_events(onsignal) == EV_NEXT_FIN)
             break;
 
         int wstatus;
