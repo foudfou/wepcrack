@@ -1,7 +1,8 @@
 #include <errno.h>
-#include <fcntl.h>           /* For O_* constants */
+#include <fcntl.h>              /* For O_* constants */
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>           /* For S_* constants */
 #include <time.h>
 #include "bit.h"
 #include "ipc.h"

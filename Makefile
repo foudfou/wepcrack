@@ -19,10 +19,17 @@ ifneq "$(origin CC)" "environment"
   endif
 endif
 
+uname_s = $(shell uname -s)
+ifeq ($(uname_s), Linux)
+  PKGCONF = pkg-config
+else ifeq ($(uname_sS), FreeBSD)
+  PKGCONF = pkgconf
+endif
+
 DEFS = -D_XOPEN_SOURCE=700
 CFLAGS = $(DEFS) -std=c11 -Wall -Wextra -I$(SRCDIR) \
-  `pkg-config --cflags openssl`
-LDFLAGS = -lm `pkg-config --libs openssl` -pthread
+  `${PKGCONF} --cflags openssl`
+LDFLAGS = -lm `${PKGCONF} --libs openssl` -pthread
 
 BUILD_ENV ?= dev
 ifneq ($(BUILD_ENV),release)
@@ -39,12 +46,12 @@ TESTS    = $(patsubst %.c,%,$(TEST_SRC))
 all: $(TARGET) $(TESTS) test
 
 $(TARGET): $(OBJ)
-	@printf "\e[33mLinking\e[0m %s\n" $@
+	@printf "${colyellow}Linking${colreset} %s\n" $@
 	@$(CC) -o $@ $^ $(LDFLAGS)
-	@printf "\e[34mMain target built\e[0m\n"
+	@printf "${colblue}Main target built${colreset}\n"
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.c
-	@printf "\e[36mCompiling\e[0m %s\n" $@
+	@printf "${colcyan}Compiling${colreset} %s\n" $@
 	@$(CC) -o $@ -c $< $(CFLAGS)
 
 test: $(TEST_OBJ) $(TESTS)
@@ -52,7 +59,7 @@ test: $(TEST_OBJ) $(TESTS)
 
 $(TESTS): $(TEST_OBJ)
 $(TESTDIR)/%: $(TESTDIR)/%.c
-	@printf "\e[32mBuilding test\e[0m %s\n" $@
+	@printf "${colgreen}Building test${colreset} %s\n" $@
 	@$(CC) -o $@ $< $(TEST_OBJ) $(CFLAGS) $(LDFLAGS)
 
 valgrind:
@@ -68,11 +75,11 @@ clean:
 	@rm -f $(TESTDIR)/tests.log
 	@rm -f /tmp/valgrind-*
 	@rm -f $(TESTDIR)/*_tests
-	@printf "\e[34mCleaned\e[0m\n"&
+	@printf "${colblue}Cleaned${colreset}\n"&
 
 distclean: clean
 	@rm -rf $(TARGET)
-	@printf "\e[34mAll clear!\e[0m\n"&
+	@printf "${colblue}All clear!${colreset}\n"&
 
 TAGS: $(SRC) $(TEST_SRC)
 	etags $(SRC) $(TEST_SRC)
@@ -86,3 +93,9 @@ show:
 	@echo 'LDFLAGS  :' $(LDFLAGS)
 	@echo 'CC       :' $(CC)
 	@echo 'TEST     :' $(TESTS)
+
+colreset  = \033[0;0m
+colgreen  = \033[0;32m
+colyellow = \033[0;33m
+colblue   = \033[0;34m
+colcyan   = \033[0;36m
