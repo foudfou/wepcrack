@@ -40,6 +40,7 @@ int gen_state_save(const struct gen_ctx *ctx);
 int gen_state_read(struct gen_task_state *states[MAX_PROCS]);
 void gen_state_destroy(int states_len, struct gen_task_state *states[MAX_PROCS]);
 
-bool gen_deploy(const int qid, const int nprocs, const gen_apply_fn pw_apply);
+bool gen_deploy(struct gen_ctx *ctx, const int nprocs,
+                const gen_apply_fn pw_apply);
 
 #endif /* GENERATOR_H */

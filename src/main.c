@@ -52,16 +52,22 @@ int main(int argc, char *argv[])
     }
 
     int nprocs = sysconf(_SC_NPROCESSORS_ONLN);
+    events.mainpid = getpid();
 
+    dict_apply_fn pw_apply = wep_check_key_with_data;
     if (options.wordlist) {
         fprintf(stderr, "Parsing %s.\n", options.wordlist);
-        // TODO: dict_fork();
-        if (!dict_parse(qid))
+        struct dict_ctx ctx = {
+            .pw_len = WEP_KEY_LEN, .msgqid = qid, .nprocs = nprocs,
+            .task_id = -1
+        };
+        if (!dict_parse(&ctx, pw_apply))
             retcode = EXIT_FAILURE;
     }
     else {
-        gen_apply_fn pw_apply = wep_check_key_with_data;
-        if (!gen_deploy(qid, nprocs, pw_apply))
+        struct gen_ctx *ctx =
+            gen_ctx_create(WEP_ALPHABET, WEP_ALPHABET_LEN, WEP_KEY_LEN, qid);
+        if (!gen_deploy(ctx, nprocs, pw_apply))
             retcode = EXIT_FAILURE;
     }
 

@@ -12,7 +12,7 @@ exercice to improve my C/system programming skills.
   passwords from a dictionary file.
 * Forks to use all available cores.
 * Traps SIGUSR1 to display the current state.
-* Traps SIGINT, to save the current state to a file.
+* Traps SIGINT to save the current state to a file.
 * Can read a state file to resume the computation.
 
 ## Design

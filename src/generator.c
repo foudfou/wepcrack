@@ -64,13 +64,13 @@ void gen_apply(struct gen_ctx *ctx, const gen_apply_fn fun)
     unsigned long long thrl = 0;
     alarm(THRL_DELAY);
     while (ctx->state.cur < ctx->state.until) {
-        if (BIT_CHK(events, EV_SIGUSR1)) {
-            BIT_CLR(events, EV_SIGUSR1);
+        if (BIT_CHK(events.sigs, EV_SIGUSR1)) {
+            BIT_CLR(events.sigs, EV_SIGUSR1);
             fprintf(stderr, "(%d) currently at %llu (%llu keys/s).\n",
                     ctx->state.task_id, ctx->state.cur, thrl);
         }
-        if (BIT_CHK(events, EV_SIGINT)) {
-            BIT_CLR(events, EV_SIGINT);
+        if (BIT_CHK(events.sigs, EV_SIGINT)) {
+            BIT_CLR(events.sigs, EV_SIGINT);
             struct msg_buf state_msg;
             state_msg.type = MSG_TYPE_TASK_STATE;
             // serialize
@@ -84,8 +84,8 @@ void gen_apply(struct gen_ctx *ctx, const gen_apply_fn fun)
             }
             return;
         }
-        if (BIT_CHK(events, EV_SIGALRM)) {
-            BIT_CLR(events, EV_SIGALRM);
+        if (BIT_CHK(events.sigs, EV_SIGALRM)) {
+            BIT_CLR(events.sigs, EV_SIGALRM);
             thrl = (ctx->state.cur - state_last) / THRL_DELAY;
             state_last = ctx->state.cur;
             alarm(THRL_DELAY);
@@ -249,10 +249,8 @@ gen_fork(pid_t *pids, struct gen_ctx *ctx, const gen_apply_fn pw_apply,
     return true;
 }
 
-bool gen_deploy(const int qid, const int nprocs, const gen_apply_fn pw_apply)
+bool gen_deploy(struct gen_ctx *ctx, const int nprocs, const gen_apply_fn pw_apply)
 {
-    struct gen_ctx *ctx =
-        gen_ctx_create(WEP_ALPHABET, WEP_ALPHABET_LEN, WEP_KEY_LEN, qid);
     if (!ctx) {
         fprintf(stderr, "Can't create context. Exiting.\n");
         return false;
@@ -289,16 +287,14 @@ bool gen_deploy(const int qid, const int nprocs, const gen_apply_fn pw_apply)
         return false;
     }
 
-    pid_t wpid;
-    int wstatus;
     int sigint = 0;
     for (;;) {
-        if (BIT_CHK(events, EV_SIGUSR1)) {
-            BIT_CLR(events, EV_SIGUSR1);
+        if (BIT_CHK(events.sigs, EV_SIGUSR1)) {
+            BIT_CLR(events.sigs, EV_SIGUSR1);
             sig_children(pids, ctx->nprocs, SIGUSR1);
         }
-        if (BIT_CHK(events, EV_SIGINT)) {
-            BIT_CLR(events, EV_SIGINT);
+        if (BIT_CHK(events.sigs, EV_SIGINT)) {
+            BIT_CLR(events.sigs, EV_SIGINT);
             sigint += 1;
             if (sigint > 1) {
                 sig_children(pids, ctx->nprocs, SIGINT);
@@ -315,10 +311,11 @@ bool gen_deploy(const int qid, const int nprocs, const gen_apply_fn pw_apply)
                     " Hit a second time to quit.\n");
         }
 
-        wpid = waitpid(-1, &wstatus, WNOHANG);
+        int wstatus;
+        pid_t wpid = waitpid(-1, &wstatus, WNOHANG);
         if (wpid == -1) {
             if (errno == ECHILD) {
-                fprintf(stderr, "All proceseses ended.\n");
+                fprintf(stderr, "All processes ended.\n");
                 break;
             }
             if (errno != EINTR) {

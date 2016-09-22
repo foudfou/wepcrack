@@ -6,6 +6,7 @@
 
 #include <stdbool.h>
 
+// TODO: support other key lengths.
 #define WEP_KEY_LEN 5
 #define WEP_IV_LEN  3
 #define WEP_ICV_LEN 4

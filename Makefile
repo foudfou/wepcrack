@@ -19,10 +19,10 @@ ifneq "$(origin CC)" "environment"
   endif
 endif
 
-DEFS = -D _XOPEN_SOURCE=700
+DEFS = -D_XOPEN_SOURCE=700
 CFLAGS = $(DEFS) -std=c11 -Wall -Wextra -I$(SRCDIR) \
   `pkg-config --cflags openssl`
-LDFLAGS = -lm `pkg-config --libs openssl`
+LDFLAGS = -lm `pkg-config --libs openssl` -pthread
 
 BUILD_ENV ?= dev
 ifneq ($(BUILD_ENV),release)
