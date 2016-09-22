@@ -22,8 +22,10 @@ endif
 uname_s = $(shell uname -s)
 ifeq ($(uname_s), Linux)
   PKGCONF = pkg-config
-else ifeq ($(uname_sS), FreeBSD)
+else ifeq ($(uname_s), FreeBSD)
   PKGCONF = pkgconf
+else
+ $(error Untested platform)
 endif
 
 DEFS = -D_XOPEN_SOURCE=700
