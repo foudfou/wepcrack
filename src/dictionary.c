@@ -7,7 +7,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include "config.h"
-#include "dict.h"
+#include "dictionary.h"
 #include "bit.h"
 #include "ipc.h"
 #include "options.h"

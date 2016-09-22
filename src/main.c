@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include "generator.h"
-#include "dict.h"
+#include "dictionary.h"
 #include "ipc.h"
 #include "options.h"
 #include "utils.h"

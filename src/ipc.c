@@ -6,7 +6,7 @@
 #include "bit.h"
 #include "ipc.h"
 
-extern volatile struct sig_events events = { 0 };
+volatile struct sig_events events = { 0 };
 
 static int msg_queue(const char *path, const int mode)
 {
@@ -93,6 +93,8 @@ int msg_install(const char *path)
 
 void sig_handler(int signo, siginfo_t * siginfo, void * uctx)
 {
+    (void)uctx;  // unused
+
     events.sigpid = siginfo->si_pid;
     switch (signo) {
     case SIGALRM:

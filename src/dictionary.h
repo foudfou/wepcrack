@@ -1,5 +1,5 @@
-#ifndef DICT_H
-#define DICT_H
+#ifndef DICTIONARY_H
+#define DICTIONARY_H
 
 #include <stdbool.h>
 
@@ -15,4 +15,4 @@ struct dict_ctx
 
 bool dict_parse(struct dict_ctx *ctx, const dict_apply_fn pw_apply);
 
-#endif /* DICT_H */
+#endif /* DICTIONARY_H */
