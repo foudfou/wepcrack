@@ -191,7 +191,7 @@ bool dict_parse(struct dict_ctx *ctx, const dict_apply_fn pw_apply)
         offset += idx + 1;
 
         if (idx >= MSG_TEXT_LEN) {
-            fprintf(stderr, "WARNING: ignored too long password '%s'.\n", buf);
+            fprintf(stderr, "WARNING: ignored too long password on line %llu.\n", line);
             continue;
         }
         if (*(c - 1) == '\r')
