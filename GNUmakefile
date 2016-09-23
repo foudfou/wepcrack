@@ -21,6 +21,7 @@ endif
 
 uname_s = $(shell uname -s)
 ifeq ($(uname_s), Linux)
+  DEFS = -D_XOPEN_SOURCE=700
   PKGCONF = pkg-config
 else ifeq ($(uname_s), FreeBSD)
   PKGCONF = pkgconf
@@ -28,7 +29,6 @@ else
  $(error Untested platform)
 endif
 
-DEFS = -D_XOPEN_SOURCE=700
 CFLAGS = $(DEFS) -std=c11 -Wall -Wextra -I$(SRCDIR) \
   `${PKGCONF} --cflags openssl`
 LDFLAGS = -lm `${PKGCONF} --libs openssl` -pthread
@@ -95,6 +95,7 @@ show:
 	@echo 'LDFLAGS  :' $(LDFLAGS)
 	@echo 'CC       :' $(CC)
 	@echo 'TEST     :' $(TESTS)
+	@echo 'PKGCONF  :' $(PKGCONF)
 
 colreset  = \033[0;0m
 colgreen  = \033[0;32m
