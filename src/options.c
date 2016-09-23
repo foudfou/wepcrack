@@ -6,32 +6,41 @@
 #include "options.h"
 
 struct opt_def options = {
-    .restore = false,
+    .dictionary = false,
+    .resume = false,
     .wordlist = 0,
     .statefile = "/tmp/wepcrack.dmp",
 };
 
+/* best vaoid `optional_argument` which requires no space btw. the switch and
+ * the value (-oarg) or '       = ' (--opt=arg)... */
 static struct option opt_long[] = {
-    {"restore",   no_argument,       0, 'r'},
-    {"wordlist",  required_argument, 0, 'w'},
-    {"statefile", required_argument, 0, 's'},
+    {"dictionary", required_argument, 0, 'D'},
+    {"resume",    no_argument,       0, 'r'},
+    {"wordlist",   required_argument, 0, 'w'},
+    {"statefile",  required_argument, 0, 's'},
     { 0 },
 };
-static char *opt_str = "hrw:s:";
+static char *opt_str = "Dhrw:s:";
 
 static void usage()
 {
-  printf("Usage: wepcrack [ options ]\n");
+  printf("Usage: wepcrack [options...]\n");
   printf("  -h, --help\n");
-  printf("  -r, --restore\n");
-  printf("  -w, --wordlist DICTFILE\n");
-  printf("  -s, --statefile STATEFILE for storing dumped state\n");
+  printf("  -D, --dictionary, parse from wordlist instead of generating\n");
+  printf("  -r, --resume\n");
+  printf("  -w, --wordlist DICTFILE, implies --dictionary\n");
+  printf("  -s, --statefile STATEFILE, for storing dumped state\n");
 }
 
 static bool opt_check(void)
 {
-    if (options.restore && options.wordlist) {
+    if (options.resume && options.wordlist) {
         fprintf(stderr, "ERROR: -r and -w can't be used together.\n");
+        return false;
+    }
+    if (options.dictionary && !options.wordlist && !options.resume) {
+        fprintf(stderr, "ERROR: -D requires -w.\n");
         return false;
     }
 
@@ -71,13 +80,17 @@ int opt_parse(const int argc, char * const *argv)
             usage();
             return -1;
             break;
+        case 'D':
+            options.dictionary = true;
+            break;
         case 'r':
-            options.restore = true;
+            options.resume = true;
             break;
         case 'w':
             options.wordlist = opt_stralloc(optarg);
             if (!options.wordlist)
                 return 1;
+            options.dictionary = true;
             break;
         case 's':
             options.statefile = opt_stralloc(optarg);

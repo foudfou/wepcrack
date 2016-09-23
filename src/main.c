@@ -55,8 +55,7 @@ int main(int argc, char *argv[])
     events.mainpid = getpid();
 
     dict_apply_fn pw_apply = wep_check_key_with_data;
-    if (options.wordlist) {
-        fprintf(stderr, "Parsing %s.\n", options.wordlist);
+    if (options.dictionary) {
         struct dict_ctx ctx = {
             .pw_len = WEP_KEY_LEN, .msgqid = qid, .nprocs = nprocs,
             .task_id = -1

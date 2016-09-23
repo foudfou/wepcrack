@@ -3,15 +3,18 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <inttypes.h>
 
 #define STRTOINT_ULL 0
 #define STRTOINT_L   1
+#define STRTOINT_J   2
 
 #define BOOL2STR(v) v ? "true" : "false"
 
 union int_t {
-    long l;
+    long               l;
     unsigned long long ull;
+    intmax_t           j;
 };
 
 unsigned long long powull(unsigned long long base, unsigned long long exp);

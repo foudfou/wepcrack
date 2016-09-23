@@ -258,7 +258,7 @@ bool gen_deploy(struct gen_ctx *ctx, const int nprocs, const gen_apply_fn pw_app
 
     int task_states_len = 0;
     struct gen_task_state *task_states[MAX_PROCS] = { 0 };
-    if (options.restore) {
+    if (options.resume) {
         fprintf(stderr, "Restoring from %s.\n", options.statefile);
         ctx->nprocs = task_states_len = gen_state_read(task_states);
         if (!ctx->nprocs) {
@@ -298,8 +298,7 @@ bool gen_deploy(struct gen_ctx *ctx, const int nprocs, const gen_apply_fn pw_app
             sigint += 1;
             if (sigint > 1) {
                 sig_children(pids, ctx->nprocs, SIGINT);
-                int ret = gen_state_save(ctx);
-                if (ret != ctx->nprocs) {
+                if (gen_state_save(ctx) != ctx->nprocs) {
                     fprintf(stderr, "ERROR: Could not complete saving state.\n");
                     gen_state_destroy(task_states_len, task_states);
                     return false;

@@ -47,6 +47,9 @@ union int_t intfromstr(const char *str, const int itype, bool *err)
     case STRTOINT_L:
         val.l = strtol(str, &endptr, 10);
         break;
+    case STRTOINT_J:
+        val.j = strtoimax(str, &endptr, 10);
+        break;
     default:
         fprintf(stderr, "Unsupported type %d\n", itype);
         *err = true;

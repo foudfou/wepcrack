@@ -11,9 +11,14 @@
 #include "bit.h"
 #include "ipc.h"
 #include "options.h"
+#include "utils.h"
+
+#define DICT_STATE_SEP ":"
 
 #define SEM_NAME_EMPTY "/wepcrack.emp"
 #define SEM_NAME_FULL  "/wepcrack.ful"
+
+#define MAX_LINE_DICT_STATE 1024
 
 typedef int (*callback)(void *);
 
@@ -118,10 +123,96 @@ dict_fork(struct dict_ctx *ctx, pid_t *pids, struct semphr sempair[2],
     return true;
 }
 
-struct producer_cb_params {
-    int   nprocs;
-    pid_t *pids;
-};
+static bool dict_state_save(const struct dict_state *state)
+{
+    int ret = false;
+
+    char statestr[MAX_LINE_DICT_STATE];
+    char *abspath;
+    abspath = realpath(options.wordlist, NULL);
+    if (!abspath) {
+        perror("realpath");
+        return false;
+    }
+    else {
+        snprintf(statestr, MAX_LINE_DICT_STATE,
+                 "%s"DICT_STATE_SEP"%llu"DICT_STATE_SEP"%jd",
+                 abspath, state->line, state->offset);
+        free(abspath);
+    }
+
+    FILE * statefile = fopen(options.statefile, "w");
+    if (!statefile) {
+        perror("fopen");
+        return ret;
+    }
+
+    if (fputs(statestr, statefile) == EOF) {
+        fprintf(stderr, "fputs failed.\n");
+        goto cleanup;
+    }
+    ret = true;
+
+  cleanup:
+    fclose(statefile);
+    return ret;
+}
+
+#define DICT_STATE_READ_ECHK_STRTOK()  if (!tok) {                    \
+    fprintf(stderr, "ERROR: premature ending when parsing state.\n"); \
+    goto cleanup;                                                     \
+  }
+
+#define DICT_STATE_READ_ECHK_INTFROMSTR(msg)  if (err) {           \
+    fprintf(stderr, "ERROR: error parsing %s from state.\n", msg); \
+    goto cleanup;                                                  \
+  }
+
+static bool dict_state_read(struct dict_state *state)
+{
+    int ret = false;
+
+    FILE * statefile = fopen(options.statefile, "r");
+    if (!statefile) {
+        perror("fopen");
+        return false;
+    }
+
+    char buf[MAX_LINE];
+    if (!fgets(buf, MAX_LINE, statefile)) {
+        fprintf(stderr, "ERROR: could not read from in state file.\n");
+        goto cleanup;
+    }
+
+    char *tok = strtok(buf, DICT_STATE_SEP);
+    if (!tok)
+        goto cleanup;
+    options.wordlist = opt_stralloc(tok);
+
+    bool err;
+    tok = strtok(NULL, DICT_STATE_SEP);
+    DICT_STATE_READ_ECHK_STRTOK()
+    state->line = (intfromstr(tok, STRTOINT_ULL, &err)).ull;
+    DICT_STATE_READ_ECHK_INTFROMSTR("line number")
+
+    /* Couln't avoid code duplication: we could loop over an array of param
+       structs. But offsetof() is not sufficient as we'd need to also pass the
+       type of state member. Which we can't easily do without the non-portable
+       typeof(), maybe with enum and switch, but that wouldn't be worth it. */
+    tok = strtok(NULL, DICT_STATE_SEP);
+    DICT_STATE_READ_ECHK_STRTOK();
+    state->offset = (intfromstr(tok, STRTOINT_J, &err)).j;
+    DICT_STATE_READ_ECHK_INTFROMSTR("offset");
+
+    if (strtok(NULL, DICT_STATE_SEP)) {
+        fprintf(stderr, "ERROR: remaining data in state file\n");
+        goto cleanup;
+    }
+
+  cleanup:
+    fclose(statefile);
+    return ret;
+}
 
 static int usr1_producer_cb(void *data) {
     struct producer_cb_params *params = data;
@@ -135,6 +226,10 @@ static int int_producer_cb(void *data) {
     sigint += 1;
     if (sigint > 1) {
         sig_children(params->pids, params->nprocs, SIGINT);
+        if (!dict_state_save(params->state))
+            fprintf(stderr, "ERROR: Could not complete saving state.\n");
+        else
+            fprintf(stderr, "\nState saved to %s.\n", options.statefile);
         return EV_NEXT_FIN;
     }
     fprintf(stderr, " Termination request."
@@ -160,12 +255,20 @@ bool dict_parse(struct dict_ctx *ctx, const dict_apply_fn pw_apply)
         return false;
     }
 
-    struct producer_cb_params params = {ctx->nprocs, pids};
+    struct dict_state state = { 0 };
+    struct producer_cb_params params = {ctx->nprocs, pids, &state};
     struct listener onsignal[3] = {
         {usr1_producer_cb, (void*)&params},
         {NULL, NULL},
         {int_producer_cb, (void*)&params},
     };
+
+    if (options.resume) {
+        fprintf(stderr, "Restoring previous session from %s.\n", options.statefile);
+        dict_state_read(&state);
+        fprintf(stderr, "Resuming from %s, line %llu.\n", options.wordlist, state.line);
+    }
+    fprintf(stderr, "Parsing %s.\n", options.wordlist);
 
     FILE * dictfile = fopen(options.wordlist, "r");
     if (!dictfile) {
@@ -173,25 +276,31 @@ bool dict_parse(struct dict_ctx *ctx, const dict_apply_fn pw_apply)
         return false;
     }
 
-    off_t offset = -1;
-    unsigned long long line = 0;
+    if (options.resume) {
+        if (fseeko(dictfile, state.offset, SEEK_SET) != 0) {
+            perror("fseek");
+            fclose(dictfile);
+            return false;
+        }
+    }
+
     char buf[MAX_LINE];
     while (fgets(buf, MAX_LINE, dictfile)) {
         if (check_events(onsignal) == EV_NEXT_FIN)
             break;
 
-        line += 1;
+        state.line += 1;
+        state.offset = ftello(dictfile);
         const char *c = strchr(buf, '\n');
         if (!c) {
-            fprintf(stderr, "WARNING: no '\\n' found line %llu.\n", line);
+            fprintf(stderr, "WARNING: no '\\n' found line %llu.\n", state.line);
             continue;
         }
 
         ptrdiff_t idx = c - buf;
-        offset += idx + 1;
-
         if (idx >= MSG_TEXT_LEN) {
-            fprintf(stderr, "WARNING: ignored too long password on line %llu.\n", line);
+            fprintf(stderr, "WARNING: ignored too long password on line %llu.\n",
+                    state.line);
             continue;
         }
         if (*(c - 1) == '\r')
@@ -201,10 +310,14 @@ bool dict_parse(struct dict_ctx *ctx, const dict_apply_fn pw_apply)
         word_msg.type = MSG_TYPE_WORD_READY;
         memcpy(word_msg.text, buf, idx);
         word_msg.text[idx] = '\0';
-        sem_wait(sempair[0].semp);
-        // FIXME: what if fails regarding to sem_post() ?
+        if (sem_wait(sempair[0].semp) != 0) {
+            perror("sem_wait");
+            fprintf(stderr, "ERROR: sem_wait failed for word message: %s\n",
+                    word_msg.text);
+            continue;
+        }
         if (!msg_put(ctx->msgqid, &word_msg)) {
-            fprintf(stderr, "ERROR: could queue word message: %s\n",
+            fprintf(stderr, "ERROR: could not queue word message: %s\n",
                     word_msg.text);
         }
         sem_post(sempair[1].semp);
@@ -229,7 +342,6 @@ bool dict_parse(struct dict_ctx *ctx, const dict_apply_fn pw_apply)
             }
             if (errno != EINTR) {
                 perror("waitpid");
-                /* gen_state_destroy(task_states_len, task_states); */
                 return false;
             }
         }
