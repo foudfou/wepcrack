@@ -153,17 +153,31 @@ void sig_children(const pid_t *pids, const int nprocs, const int sig)
 
 
 bool spair_init(struct semphr spair[2]) {
+    bool ret = true;
+    bool clean = false;
     for (int i = 0; i < 2; ++i) {
         spair[i].semp =
             sem_open(spair[i].name, O_CREAT|O_EXCL, S_IRWXU, spair[i].initval);
         if (spair[i].semp == SEM_FAILED) {
             if (errno == EEXIST)
-                sem_unlink(spair[i].name);
-            perror(spair[i].name);
-            return false;
+                clean = true;
+            else
+                perror(spair[i].name);
+            ret = false;
+            break;
         }
     }
-    return true;
+
+    if (clean) {
+        fprintf(stderr, "Found existing semaphore. Cleaning...\n");
+        for (int i = 0; i < 2; ++i) {
+            if (sem_unlink(spair[i].name) != 0) {
+                perror("sem_unlink");
+            }
+        }
+    }
+
+    return ret;
 }
 
 bool spair_end(struct semphr spair[2]) {
