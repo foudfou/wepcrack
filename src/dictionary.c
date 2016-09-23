@@ -13,12 +13,13 @@
 #include "options.h"
 #include "utils.h"
 
-#define DICT_STATE_SEP ":"
-
 #define SEM_NAME_EMPTY "/wepcrack.emp"
 #define SEM_NAME_FULL  "/wepcrack.ful"
 
 #define MAX_LINE_DICT_STATE 1024
+
+#define DICT_STATE_SEP ":"
+#define DICT_NSIGS 4
 
 typedef int (*callback)(void *);
 
@@ -27,9 +28,22 @@ struct listener {
     void     *data;
 };
 
-int check_events(struct listener onsig[3]) {
-    int evsig[3] = {EV_SIGUSR1, EV_SIGUSR2, EV_SIGINT};
-    for (int i = 0; i < 3; i++) {
+struct dict_state {
+    unsigned long long line;
+    unsigned long long line_prev;
+    off_t              offset;
+    unsigned long long thrl;
+};
+
+struct producer_cb_params {
+    int                nprocs;
+    pid_t             *pids;
+    struct dict_state *state;
+};
+
+static int check_events(struct listener onsig[DICT_NSIGS]) {
+    int evsig[DICT_NSIGS] = {EV_SIGUSR1, EV_SIGUSR2, EV_SIGINT, EV_SIGALRM};
+    for (int i = 0; i < DICT_NSIGS; i++) {
         if (BIT_CHK(events.sigs, evsig[i])) {
             BIT_CLR(events.sigs, evsig[i]);
             if (onsig[i].cb) {
@@ -59,10 +73,11 @@ dict_consume(const struct dict_ctx *ctx, struct semphr sempair[2],
 {
     bool finish = false;
 
-    struct listener onsignal[3] = {
+    struct listener onsignal[DICT_NSIGS] = {
         {NULL, NULL},
         {usr2_consumer_cb, (void*)&finish},
         {int_consumer_cb, NULL},
+        {NULL, NULL},
     };
 
     for (;;) {
@@ -216,7 +231,8 @@ static bool dict_state_read(struct dict_state *state)
 
 static int usr1_producer_cb(void *data) {
     struct producer_cb_params *params = data;
-    sig_children(params->pids, params->nprocs, SIGUSR1);
+    fprintf(stderr, "Currently at line %llu (%llu keys/s).\n",
+            params->state->line, params->state->thrl);
     return EV_NEXT_CONT;
 }
 
@@ -234,6 +250,15 @@ static int int_producer_cb(void *data) {
     }
     fprintf(stderr, " Termination request."
             " Hit a second time to quit.\n");
+    return EV_NEXT_CONT;
+}
+
+static int alrm_producer_cb(void *data) {
+    struct producer_cb_params *params = data;
+    struct dict_state *state = params->state;
+    state->thrl = (state->line - state->line_prev) / THRL_DELAY;
+    state->line_prev = state->line;
+    alarm(THRL_DELAY);
     return EV_NEXT_CONT;
 }
 
@@ -257,10 +282,11 @@ bool dict_parse(struct dict_ctx *ctx, const dict_apply_fn pw_apply)
 
     struct dict_state state = { 0 };
     struct producer_cb_params params = {ctx->nprocs, pids, &state};
-    struct listener onsignal[3] = {
+    struct listener onsignal[DICT_NSIGS] = {
         {usr1_producer_cb, (void*)&params},
         {NULL, NULL},
-        {int_producer_cb, (void*)&params},
+        {int_producer_cb,  (void*)&params},
+        {alrm_producer_cb, (void*)&params},
     };
 
     if (options.resume) {
@@ -284,6 +310,7 @@ bool dict_parse(struct dict_ctx *ctx, const dict_apply_fn pw_apply)
         }
     }
 
+    alarm(THRL_DELAY);
     char buf[MAX_LINE];
     while (fgets(buf, MAX_LINE, dictfile)) {
         if (check_events(onsignal) == EV_NEXT_FIN)

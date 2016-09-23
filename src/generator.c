@@ -7,6 +7,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include "bit.h"
+#include "config.h"
 #include "ipc.h"
 #include "options.h"
 #include "utils.h"
@@ -14,7 +15,6 @@
 #include "generator.h"
 
 #define GEN_STATE_SEP ":"
-#define THRL_DELAY 5
 
 /* Returns a new context, or NULL if any of the following occurs: malloc
  * failure, `total_n` overflow.

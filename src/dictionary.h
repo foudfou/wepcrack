@@ -5,17 +5,6 @@
 
 typedef void (* dict_apply_fn)(const unsigned char *, unsigned);
 
-struct dict_state {
-    unsigned long long  line;
-    off_t               offset;
-};
-
-struct producer_cb_params {
-    int                 nprocs;
-    pid_t              *pids;
-    struct dict_state  *state;
-};
-
 struct dict_ctx
 {
     unsigned pw_len;
