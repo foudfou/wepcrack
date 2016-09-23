@@ -190,6 +190,10 @@ bool dict_parse(struct dict_ctx *ctx, const dict_apply_fn pw_apply)
         ptrdiff_t idx = c - buf;
         offset += idx + 1;
 
+        if (idx >= MSG_TEXT_LEN) {
+            fprintf(stderr, "WARNING: ignored too long password '%s'.\n", buf);
+            continue;
+        }
         if (*(c - 1) == '\r')
             idx -= 1;
 
@@ -198,7 +202,7 @@ bool dict_parse(struct dict_ctx *ctx, const dict_apply_fn pw_apply)
         memcpy(word_msg.text, buf, idx);
         word_msg.text[idx] = '\0';
         sem_wait(sempair[0].semp);
-        // FIXME: what if fails reagarding to sem_post() ?
+        // FIXME: what if fails regarding to sem_post() ?
         if (!msg_put(ctx->msgqid, &word_msg)) {
             fprintf(stderr, "ERROR: could queue word message: %s\n",
                     word_msg.text);
@@ -210,6 +214,7 @@ bool dict_parse(struct dict_ctx *ctx, const dict_apply_fn pw_apply)
         perror("input error");
     fclose(dictfile);
 
+    fprintf(stderr, "Finished parsing wordlist.\n");
     sig_children(pids, ctx->nprocs, SIGUSR2);
     for (;;) {
         if (check_events(onsignal) == EV_NEXT_FIN)
