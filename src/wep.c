@@ -44,9 +44,8 @@ bool wep_check_key_auth(const struct wep_data *auth,
     unsigned char out[WEP_PAYLOAD_MAX+WEP_ICV_LEN];
     int out_len = 0;
     unsigned char iv[EVP_MAX_IV_LENGTH] = { 0 };
-    int encrypt = 1;
-    bool crypt_ok = ssl_crypt(EVP_rc4(), out, &out_len, frameicv, frameicv_len,
-                              ivkey, ivkey_len, iv, encrypt);
+    bool crypt_ok = ssl_crypt(SSL_OP_ENC, EVP_rc4(), out, &out_len,
+                              frameicv, frameicv_len, ivkey, ivkey_len, iv);
     assert(crypt_ok);
     assert((unsigned int)out_len == frameicv_len);
     assert(frameicv_len == auth->data_len);
@@ -66,10 +65,9 @@ bool wep_check_key_data(const struct wep_data *auth,
     unsigned char out[WEP_PAYLOAD_MAX+WEP_ICV_LEN];
     int out_len = 0;
     unsigned char iv[EVP_MAX_IV_LENGTH] = { 0 };
-    int encrypt = 0;
-    bool decrypt_ok = ssl_crypt(EVP_rc4(), out, &out_len,
+    bool decrypt_ok = ssl_crypt(SSL_OP_DEC, EVP_rc4(), out, &out_len,
                                 auth->data, auth->data_len,
-                                ivkey, ivkey_len, iv, encrypt);
+                                ivkey, ivkey_len, iv);
     assert(decrypt_ok);
     assert((unsigned int)out_len == auth->data_len);
 
