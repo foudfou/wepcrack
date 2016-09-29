@@ -91,7 +91,20 @@ int main(void)
                     (unsigned char*)b64_out1, b64_out1_len);
     ASSERT(!rv)
 
+
+    const int pass_len = 8;
+    const unsigned char pass[] = "password";
+    const int salt_len = 4;
+    const unsigned char salt[] = "salt";
+    unsigned char hmac_sha1_expected[] =
+        "\x4b\x00\x79\x01\xb7\x65\x48\x9a\xbe\xad"
+        "\x49\xd9\x26\xf7\x21\xd0\x65\xa4\x29\xc1";
+
+    unsigned char salted_pass[SHA1_LEN];
+    rv = ssl_scram_hi(salted_pass, pass, pass_len, salt, salt_len, 4096);
+    ASSERT(rv && memcmp(salted_pass, hmac_sha1_expected, SHA1_LEN) == 0)
+
     return 0;
 }
 
-#undef TEST_COUNT
+#undef CRYPT_TEST_COUNT

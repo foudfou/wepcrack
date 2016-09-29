@@ -1,6 +1,7 @@
 // man 3 EVP_EncryptInit for examples and available cyphers
 #include <string.h>
 #include <openssl/bio.h>
+#include <openssl/hmac.h>
 #include "crypto_ssl.h"
 
 bool ssl_crypt(int op, const EVP_CIPHER *cypher,
@@ -79,4 +80,36 @@ bool ssl_base64(const int op, char *out, int out_max, int *out_len,
   cleanup:
     BIO_free_all(b64);
     return rv;
+}
+
+/* SCRAM customized PBKDF2-HMAC-SHA1
+   https://tools.ietf.org/html/rfc5802#section-2.2 */
+bool ssl_scram_hi(unsigned char *out, const unsigned char *pass, int pass_len,
+                  const unsigned char *salt, int salt_len, const int iter)
+{
+    const unsigned char INT_1[4] = {0, 0, 0, 1};
+
+    unsigned char utmp[EVP_MAX_MD_SIZE];
+    unsigned int utmp_len = 0;
+
+    HMAC_CTX ctx;
+    HMAC_CTX_init(&ctx);
+    if (!HMAC_Init_ex(&ctx, pass, pass_len, EVP_sha1(), NULL) ||
+        !HMAC_Update(&ctx, salt, salt_len) ||
+        !HMAC_Update(&ctx, INT_1, 4) ||
+        !HMAC_Final(&ctx, utmp, &utmp_len)) {
+        HMAC_CTX_cleanup(&ctx);
+        return false;
+    }
+    memcpy(out, utmp, utmp_len);
+    for (int j = 1; j < iter; j++) {
+        // TODO: could we reuse ctx to get faster ?
+        if (!HMAC(EVP_sha1(), (void *)pass, pass_len,
+                  utmp, utmp_len, utmp, &utmp_len))
+            return false;
+        for (int k = 0; k < SHA1_LEN; k++)
+            out[k] ^= utmp[k];
+    }
+
+    return true;
 }
