@@ -84,10 +84,10 @@ bool ssl_base64(const int op, char *out, int out_max, int *out_len,
 
 /* SCRAM customized PBKDF2-HMAC-SHA1
    https://tools.ietf.org/html/rfc5802#section-2.2 */
-bool ssl_scram_hi(unsigned char *out, const unsigned char *pass, int pass_len,
-                  const unsigned char *salt, int salt_len, const int iter)
+bool ssl_pbkdf2_sha1(unsigned char *out, const unsigned char *pass, int pass_len,
+                     const unsigned char *salt, int salt_len, const int iter)
 {
-    const unsigned char INT_1[4] = {0, 0, 0, 1};
+    const unsigned char blkidx[4] = {0, 0, 0, 1};
 
     unsigned char utmp[EVP_MAX_MD_SIZE];
     unsigned int utmp_len = 0;
@@ -96,7 +96,7 @@ bool ssl_scram_hi(unsigned char *out, const unsigned char *pass, int pass_len,
     HMAC_CTX_init(&ctx);
     if (!HMAC_Init_ex(&ctx, pass, pass_len, EVP_sha1(), NULL) ||
         !HMAC_Update(&ctx, salt, salt_len) ||
-        !HMAC_Update(&ctx, INT_1, 4) ||
+        !HMAC_Update(&ctx, blkidx, 4) ||
         !HMAC_Final(&ctx, utmp, &utmp_len)) {
         HMAC_CTX_cleanup(&ctx);
         return false;

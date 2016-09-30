@@ -9,17 +9,18 @@
 #include "ipc.h"
 #include "options.h"
 #include "utils.h"
-#include "wep.h"
-#include "wep_data.h"
+#include "xmpp.h"
+#include "xmpp_data.h"
 
 // FIXME: all `const` declarations need to be checked: int const * const
 
-static void wep_check_key_with_data(const unsigned char *key, unsigned len)
+static void xmpp_check_auth_with(const unsigned char *key, unsigned len)
 {
-    if (wep_check_key_auth(&wep_auth1, key, len)) {
-        char keyhex[2*WEP_KEY_LEN+1];
-        tohex(keyhex, key, WEP_KEY_LEN);
-        printf("!!! KEY FOUND -> 0x%s !!!\n", keyhex);
+    if (xmpp_auth_check((char *)key, len, xmpp_salt1, xmpp_salt1_len,
+                        xmpp_iter1, xmpp_auth_msg1, xmpp_cli_final_proof1)) {
+        char keyhex[2*len];
+        tohex(keyhex, key, len);
+        printf("!!! KEY FOUND -> %s (0x%s) !!!\n", key, keyhex);
     }
 }
 
@@ -54,10 +55,11 @@ int main(int argc, char *argv[])
     int nprocs = sysconf(_SC_NPROCESSORS_ONLN);
     events.mainpid = getpid();
 
-    dict_apply_fn pw_apply = wep_check_key_with_data;
+    dict_apply_fn pw_apply = xmpp_check_auth_with;
     if (options.dictionary) {
         struct dict_ctx ctx = {
-            .pw_len = WEP_KEY_LEN, .msgqid = qid, .nprocs = nprocs,
+            // FIXME: pw_len needs to be config
+            .pw_len = 0, .msgqid = qid, .nprocs = nprocs,
             .task_id = -1
         };
         if (!dict_parse(&ctx, pw_apply))
@@ -65,7 +67,8 @@ int main(int argc, char *argv[])
     }
     else {
         struct gen_ctx *ctx =
-            gen_ctx_create(WEP_ALPHABET, WEP_ALPHABET_LEN, WEP_KEY_LEN, qid);
+            // FIXME: alpha and aplha_len need to be config
+            gen_ctx_create(0, 0, 0, qid);
         if (!gen_deploy(ctx, nprocs, pw_apply))
             retcode = EXIT_FAILURE;
     }

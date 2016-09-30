@@ -101,7 +101,7 @@ int main(void)
         "\x49\xd9\x26\xf7\x21\xd0\x65\xa4\x29\xc1";
 
     unsigned char salted_pass[SHA1_LEN];
-    rv = ssl_scram_hi(salted_pass, pass, pass_len, salt, salt_len, 4096);
+    rv = ssl_pbkdf2_sha1(salted_pass, pass, pass_len, salt, salt_len, 4096);
     ASSERT(rv && memcmp(salted_pass, hmac_sha1_expected, SHA1_LEN) == 0)
 
     return 0;

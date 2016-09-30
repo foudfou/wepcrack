@@ -7,7 +7,7 @@
 #define SSL_OP_ENC 0
 #define SSL_OP_DEC 1
 
-#define SHA1_LEN EVP_MD_size(EVP_sha1())
+#define SHA1_LEN 20 // EVP_MD_size(EVP_sha1())
 
 bool ssl_crypt(int op, const EVP_CIPHER *cypher,
                unsigned char *out, int *out_len,
@@ -22,7 +22,7 @@ bool ssl_digest(const EVP_MD *md,
 bool ssl_base64(const int op, char *out, int out_max, int *out_len,
                 const unsigned char* in, const int in_len);
 
-bool ssl_scram_hi(unsigned char *out, const unsigned char *key, int key_len,
-                  const unsigned char *data, int data_len, const int iter);
+bool ssl_pbkdf2_sha1(unsigned char *out, const unsigned char *key, int key_len,
+                     const unsigned char *data, int data_len, const int iter);
 
 #endif /* CRYPTO_SSL_H */

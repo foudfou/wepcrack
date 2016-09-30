@@ -103,9 +103,7 @@ dict_consume(const struct dict_ctx *ctx, struct semphr sempair[2],
             fprintf(stderr, "ERROR: (%d) could not get msg.\n", ctx->task_id);
         }
         else if (ret > 0) {
-            if (strlen(msg.text) == ctx->pw_len) {
-                (*pw_apply)((unsigned char *)msg.text, ctx->pw_len);
-            }
+            (*pw_apply)((unsigned char *)msg.text, strlen(msg.text));
         }
         sem_post(sempair[0].semp);
     }
@@ -332,6 +330,9 @@ bool dict_parse(struct dict_ctx *ctx, const dict_apply_fn pw_apply)
         }
         if (*(c - 1) == '\r')
             idx -= 1;
+
+        if (ctx->pw_len && idx != ctx->pw_len)
+            continue;
 
         struct msg_buf word_msg;
         word_msg.type = MSG_TYPE_WORD_READY;
